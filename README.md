@@ -69,10 +69,14 @@ skill vs persistence, and 90% bootstrap intervals over days. Random seeds are fi
 
 ## AI-use disclosure
 
-AI assistance (Claude, by Anthropic, through Claude Code) was used for brainstorming the project plan, explaining
-methods, writing and debugging the notebooks and website code, and editing text. All design decisions were made
-and confirmed by the student (see `DECISIONS.md`); results were checked by re-running the notebooks, and every
-website number is exported from them. *(Edit this paragraph to match exactly how you used AI.)*
+AI assistance (Claude, by Anthropic, through Claude Code) was used mainly to build the project website
+(the HTML, CSS and JavaScript in `docs/`, including the interactive charts), and for help with writing and
+debugging code and with editing text.
+
+The project question, the choice of the three input cases, the models, the train/validation/test split, the
+scoring window and metrics, the data-cleaning decisions and the interpretation of the results were decided by me;
+each decision and its reason is logged in `DECISIONS.md`. I checked the results by re-running the notebooks and
+recomputing key numbers independently, and every number on the website is exported from those notebooks.
 
 ## References
 
@@ -84,4 +88,3 @@ website number is exported from them. *(Edit this paragraph to match exactly how
   Elastic Net," *JRSS-B* 67, 2005.
 - Gujarat Electricity Regulatory Commission (GERC), forecasting and scheduling regulations, 2019 (±7% tolerance band).
 - pandas, NumPy, Matplotlib, Plotly.js (website charts).
-- Prior work on this plant's data: Bhimani, Kumar, Pindoriya *(add the full citation)*.
