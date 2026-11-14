@@ -229,3 +229,12 @@ footer { max-width: var(--wide); margin: 64px auto 0; padding: 22px 20px 48px; b
 .chart.small { height: 190px; }
 figure.solo { margin-top: 40px; max-width: 720px; }
 @media (max-width: 860px) { .exp { grid-template-columns: 1fr; } }
+
+/* ---------- How the models learn ---------- */
+.exp.wide { grid-template-columns: 1fr; }
+.exp.wide .exp-text { max-width: var(--col); }
+table.feat td, table.feat th { text-align: right; padding: 8px 12px; white-space: nowrap; }
+table.feat td:first-child, table.feat th:first-child { text-align: left; font-weight: 600; padding-left: 0; }
+table.feat td.dropped { color: var(--bad); font-weight: 700; background: #f6e3ea; }
+table.feat td.zero { color: var(--ink-soft); }
+table.feat th.grp { border-bottom: 2px solid var(--ink); color: var(--ink); }

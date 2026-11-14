@@ -168,6 +168,94 @@
     </article>
   </section>
 
+  <section id="learn" aria-labelledby="h-learn">
+    <h2 id="h-learn">How the models learn</h2>
+    <p class="lead">The same data, taken apart: how a line is fitted, what a penalty does, why averaging trees helps, and
+      whether more data would.</p>
+
+    <article class="exp">
+      <div class="exp-text">
+        <h3>Walking downhill to the best line</h3>
+        <p>Case 1 fits a line: tomorrow = b₀ + b₁ × today. Every pair (b₀, b₁) has an error; the map shows it. Gradient descent
+          starts anywhere and repeatedly steps downhill. Click the map to move the start.</p>
+        <div class="switch small" id="gd-mode" role="radiogroup" aria-label="Input scaling">
+          <button role="radio" data-v="raw">Raw input</button><button role="radio" data-v="std">Standardised input</button>
+        </div>
+        <label class="dial" for="gd-rate">Step size, as a share of the largest safe step
+          <input type="range" id="gd-rate" min="5" max="115" step="5" value="60">
+          <output id="gd-out" for="gd-rate"></output></label>
+        <div class="day-nav">
+          <button class="ghost" id="gd-step">Take a step</button>
+          <button class="ghost" id="gd-run">Take 25 steps</button>
+          <button class="ghost" id="gd-run-many">Take 1,000 steps</button>
+          <button class="ghost" id="gd-reset">Start over</button>
+        </div>
+        <p class="exp-result" id="gd-result"></p>
+        <p class="caption">The surface is exact for all 4,186 training blocks. With the raw input the valley is long and narrow, so
+          progress along it is slow; standardising the input (mean 0, spread 1) turns it into a round bowl. The destination is
+          the least-squares line either way.</p>
+      </div>
+      <div id="gd-chart" class="chart tall" role="img" aria-label="Error surface with the gradient descent path"></div>
+    </article>
+
+    <article class="exp">
+      <div class="exp-text">
+        <h3>What a penalty does to the inputs</h3>
+        <p>Ridge and Lasso fit the same line as linear regression but charge for large coefficients. Raise the charge: Ridge
+          shrinks every input a little; Lasso removes inputs one at a time.</p>
+        <div class="switch small" id="pen-model" role="radiogroup" aria-label="Penalised model">
+          <button role="radio" data-v="Ridge">Ridge</button><button role="radio" data-v="Lasso">Lasso</button><button role="radio" data-v="Elastic Net">Elastic Net</button>
+        </div>
+        <label class="dial" for="pen-alpha">Penalty strength α
+          <input type="range" id="pen-alpha" min="0" max="20" step="1" value="0">
+          <output id="pen-out" for="pen-alpha"></output></label>
+        <div class="day-nav"><button class="ghost" id="pen-chosen">Use the α chosen on validation</button></div>
+        <p class="exp-result" id="pen-result"></p>
+        <p class="caption">Inputs are standardised, so each bar is the change in forecast for a typical (one standard deviation)
+          change in that input. Uses the inputs chosen in the bar at the top; case 1 has a single input.</p>
+      </div>
+      <div id="pen-chart" class="chart mid" role="img" aria-label="Coefficients at the chosen penalty"></div>
+    </article>
+
+    <article class="exp wide">
+      <div class="exp-text">
+        <h3>Which inputs each model keeps</h3>
+        <p>At the settings chosen on validation. Linear models show their coefficient; a dropped input has a coefficient of
+          exactly zero. Tree models never drop an input, so they show how much the error rises when it is shuffled.</p>
+      </div>
+      <div class="table-scroll"><table id="feat-table" class="feat"></table></div>
+    </article>
+
+    <article class="exp">
+      <div class="exp-text">
+        <h3>Why averaging trees helps</h3>
+        <p>Train the same model on 50 reshuffled sets of training days. A model can be wrong in two ways: on average
+          (bias), or by changing its mind from one training set to the next (variance).</p>
+        <label class="dial" for="bv-trees">Trees averaged in the forest
+          <input type="range" id="bv-trees" min="0" max="7" step="1" value="0">
+          <output id="bv-out" for="bv-trees"></output></label>
+        <p class="exp-result" id="bv-result"></p>
+        <p class="caption">Measured on validation blocks; bias² plus variance is the expected squared error, in (% of capacity)².
+          Bias² also contains the noise no model could predict. Uses the inputs chosen in the bar at the top.</p>
+      </div>
+      <div id="bv-chart" class="chart mid" role="img" aria-label="Bias and variance of linear regression and forests"></div>
+    </article>
+
+    <article class="exp">
+      <div class="exp-text">
+        <h3>Would more data help?</h3>
+        <p>Give the models only the most recent days of training and watch the validation error. If it keeps falling, more
+          data would help. If it is flat, the limit is somewhere else.</p>
+        <label class="dial" for="lc-days">Training days used
+          <input type="range" id="lc-days" min="0" max="7" step="1" value="7">
+          <output id="lc-out" for="lc-days"></output></label>
+        <p class="exp-result" id="lc-result"></p>
+        <p class="caption">Uses the inputs chosen in the bar at the top. Dotted lines are the error on the days the model trained on.</p>
+      </div>
+      <div id="lc-chart" class="chart mid" role="img" aria-label="Error against number of training days"></div>
+    </article>
+  </section>
+
   <section id="errors" aria-labelledby="h-errors">
     <h2 id="h-errors">Where the forecasts go wrong</h2>
     <div id="error-map" class="chart" role="img" aria-label="Daily error of every model on every day of the selected split"></div>
