@@ -30,6 +30,40 @@
 
 <main>
 
+  <section id="start" class="start" aria-labelledby="h-start">
+    <h2 id="h-start">Start here</h2>
+    <div class="start-grid">
+      <div class="start-story">
+        <p>A solar plant sells its electricity to the grid. The grid has to balance supply and demand at every moment, so the
+          day before, each plant must tell the grid operator how much power it will produce tomorrow, in 96 slots of
+          15 minutes. This is a <b>day-ahead forecast</b>. Forecasts that miss by too much are a problem for the grid, and in
+          Gujarat a forecast is counted as acceptable when it is within 7% of the plant's capacity.</p>
+        <p>The simplest forecast is to assume <b>tomorrow will be like today</b>: copy today's output, slot by slot. This
+          project asks whether machine-learning models can do better, using the plant's own past output and weather
+          measurements, and how much a forecast of tomorrow's weather would add.</p>
+        <p class="page-guide">The page follows that question in order. <a href="#setup">Setup</a> describes the data, the models
+          and how they are tested. <a href="#results">Results</a> compares the models and lets you inspect any day.
+          <a href="#trust">Can we trust it?</a> stress-tests the best result. The <a href="#conclusion">conclusion</a> sums it up.</p>
+      </div>
+      <dl class="glossary">
+        <dt>Capacity</dt>
+        <dd>The most the plant can deliver: 21.5 MW. All errors on this page are a percentage of it.</dd>
+        <dt>Block</dt>
+        <dd>One 15-minute slot of the day. Only daytime blocks, 07:00 to 18:15, are scored.</dd>
+        <dt>Sunlight (GHI)</dt>
+        <dd>How much sunlight reaches the ground, measured at the plant in W/m². The main driver of output.</dd>
+        <dt>Persistence</dt>
+        <dd>The <q>tomorrow = today</q> forecast. The baseline every model must beat.</dd>
+        <dt>Skill</dt>
+        <dd>How much smaller a model's error is than persistence's. Positive is better, zero is a tie, negative is worse.</dd>
+        <dt>Case 1, 2, 3</dt>
+        <dd>What a model is given: yesterday's output; plus yesterday's weather; plus tomorrow's actual weather.</dd>
+        <dt>Train, validation, test</dt>
+        <dd>The winter split by date. Models learn from train, settings are chosen on validation, and test is the final check.</dd>
+      </dl>
+    </div>
+  </section>
+
   <section class="findings" aria-labelledby="h-findings">
     <h2 id="h-findings">What we found</h2>
     <ol class="finding-list">
@@ -40,6 +74,7 @@
   </section>
 
   <nav class="chapters" aria-label="Chapters">
+    <a href="#start">Start here</a>
     <a href="#setup">Setup</a>
     <a href="#results">Results</a>
     <a href="#trust">Can we trust it?</a>

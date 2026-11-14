@@ -256,3 +256,19 @@ section.chapter > .lead { max-width: 62ch; }
 
 /* The control bar now sits inside <main>: break it out to full width. */
 main > .controls-bar { width: 100vw; margin: 28px 0 0 calc(50% - 50vw); }
+
+/* ---------- Start here ---------- */
+.start { padding-top: 48px; }
+.start-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 28px 56px; align-items: start; }
+.start-story p { font-size: 18px; line-height: 1.6; }
+.page-guide { border-left: 4px solid var(--saffron); padding-left: 14px; }
+.glossary { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 0 18px; border-top: 2px solid var(--ink); }
+.glossary dt, .glossary dd { padding: 9px 0; border-bottom: 1px solid var(--rule); margin: 0; }
+.glossary dt { font-weight: 700; font-variation-settings: "wdth" 112; }
+.glossary dd { font-size: 15px; color: var(--ink-soft); }
+@media (max-width: 760px) {
+  .start-grid { grid-template-columns: 1fr; }
+  .glossary { grid-template-columns: 1fr; }
+  .glossary dt { border-bottom: 0; padding-bottom: 0; }
+  .start-story p { font-size: 17px; }
+}
