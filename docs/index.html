@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Day-ahead Solar Forecasting</title>
+  <meta name="description" content="Can tomorrow's 15-minute solar power be forecast better than 'tomorrow = today'? Baselines, linear models, Random Forest and AdaBoost on one winter of data from a 21.5 MW plant.">
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow">ES 335 · Machine Learning · Course project</div>
+    <h1>Day-ahead solar power forecasting</h1>
+    <p class="lede">Can we forecast tomorrow's power at a 21.5 MW solar plant, 15 minutes at a time, better than simply
+      assuming <em>tomorrow = today</em>? And how much does weather information help?</p>
+    <p class="byline">Dhanraj Visapara · 24110106 · <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335" id="repo-link">Source code on GitHub</a></p>
+    <div class="stats">
+      <div class="stat"><div class="v">3.8%</div><div class="k">Typical error of "tomorrow = today" on the test week (MAE, % of capacity)</div></div>
+      <div class="stat"><div class="v">0 of 6</div><div class="k">Models that clearly beat it using only yesterday's data</div></div>
+      <div class="stat"><div class="v">+19.6%</div><div class="k">Random Forest's gain when tomorrow's weather is known (test, RMSE)</div></div>
+    </div>
+    <nav>
+      <a href="#question">Question</a><a href="#data">Data</a><a href="#methods">Methods</a><a href="#evaluation">Evaluation</a>
+      <a href="#results">Results</a><a href="#explorer">Day explorer</a><a href="#limitations">Errors &amp; limitations</a>
+      <a href="#conclusion">Conclusion</a><a href="#reproduce">Reproduce</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="question">
+    <h2>Question</h2>
+    <p>On day D, forecast the plant's power for each of the 96 fifteen-minute blocks of day D+1. One row is one block of
+      D+1; the target is its power. The forecast is assumed to be made after day D ends, so all of day D is known.
+      Each model is tested with three sets of inputs, each adding one source of information:</p>
+    <ul>
+      <li><b>Case 1</b> — power at the same block on day D.</li>
+      <li><b>Case 2</b> — Case 1 plus day D's weather (sunlight, module and air temperature, wind). <i>The realistic case.</i></li>
+      <li><b>Case 3</b> — Case 2 plus day D+1's measured weather. Acts as a perfect weather forecast, so it is an upper bound, not a real forecast.</li>
+    </ul>
+    <p><b>Scope of the claim:</b> one plant and one winter (Oct 2025 – Feb 2026). The results describe this plant in
+      this season and may not carry over to other seasons or sites.</p>
+  </section>
+
+  <section id="data">
+    <h2>Data</h2>
+    <p>Plant SCADA and on-site weather-station data supplied by the course instructor: 15 Oct 2025 – 14 Feb 2026,
+      123 days × 96 blocks = 11,808 rows, with no missing timestamps or cells. The data is not redistributed: the
+      repository excludes it, and this page shows power only as a percentage of capacity.</p>
+    <div class="table-scroll"><table class="vars">
+      <tr><th>Variable</th><th>Unit</th><th>Role</th><th>Range</th></tr>
+      <tr><td>Active power</td><td>MW</td><td>Target (and yesterday's value as input)</td><td>0 – 20.8 (capacity 21.5)</td></tr>
+      <tr><td>Global horizontal irradiance (GHI)</td><td>W/m²</td><td>Input: sunlight</td><td>0 – 937</td></tr>
+      <tr><td>Module temperature</td><td>°C</td><td>Input</td><td>5 – 54</td></tr>
+      <tr><td>Ambient temperature</td><td>°C</td><td>Input</td><td>9 – 36</td></tr>
+      <tr><td>Wind speed</td><td>m/s</td><td>Input</td><td>0.2 – 3.6</td></tr>
+      <tr><td>Wind direction</td><td>unknown 0–40 scale</td><td>Input (used as recorded)</td><td>1.5 – 39.5</td></tr>
+    </table></div>
+    <div class="grid2">
+      <div><div id="data-energy" class="chart" style="height:280px"></div>
+        <p class="caption">Daily energy. Training includes a cloudy spell (26 Oct – 1 Nov); the test week is calm and clear.</p></div>
+      <div><div id="data-scatter" class="chart" style="height:280px"></div>
+        <p class="caption">Power rises with sunlight, then levels off near 80% of capacity — a curve, not a straight line.</p></div>
+    </div>
+    <h3>Cleaning</h3>
+    <ul>
+      <li><b>27 Nov 2025:</b> 07:45–16:30 had been copied from another day; replaced by the average of 26 and 28 Nov.</li>
+      <li><b>14 Jan 2026:</b> power stuck at 12.80 MW from 13:45–16:30; re-estimated from sunlight and module temperature.</li>
+      <li><b>Night sunlight</b> read 1.12 W/m² (one sensor step) instead of 0; set to 0.</li>
+      <li>Both repaired days are in the training period, so every validation and test score uses real measurements.</li>
+    </ul>
+  </section>
+
+  <section id="methods">
+    <h2>Methods</h2>
+    <div class="table-scroll"><table class="vars">
+      <tr><th>Model</th><th>Idea</th><th>Why it is here</th></tr>
+      <tr><td>Persistence</td><td>Tomorrow's block = today's block</td><td>The standard naive baseline; skill is measured against it</td></tr>
+      <tr><td>7-day average</td><td>Mean of the same block over the last 7 days</td><td>A second baseline that smooths out one-off cloudy days</td></tr>
+      <tr><td>Linear regression (MLR)</td><td>Weighted sum of inputs, least squares</td><td>Power is roughly linear in sunlight; the simplest learning model</td></tr>
+      <tr><td>Ridge / Lasso / Elastic Net</td><td>MLR with an L2, L1 or mixed penalty on coefficients</td><td>The inputs are strongly correlated (yesterday's power and sunlight, the two temperatures); Lasso can also drop useless inputs</td></tr>
+      <tr><td>Random Forest</td><td>300 regression trees on bootstrap samples, averaged</td><td>Trees can bend to follow the plant's midday plateau; averaging reduces variance</td></tr>
+      <tr><td>AdaBoost (AdaBoost.R2)</td><td>Small trees added one at a time, focusing on rows earlier trees got wrong</td><td>Reduces bias; comparing it with Random Forest shows whether errors come from bias or variance</td></tr>
+    </table></div>
+    <p><b>Assumptions:</b> linear models assume power changes in a straight line with each input — not true at the midday
+      plateau (see the Data plot). Tree models assume nothing about shape but can memorise the training period.
+      Every learning model is fitted on training data only; inputs to the penalised models are standardised with a
+      scaler fitted on training data only. Forecasts are clipped to 0–21.5 MW.</p>
+    <h3>Settings chosen on validation (lowest validation RMSE)</h3>
+    <div class="table-scroll"><table class="vars">
+      <tr><th>Model</th><th>Case 1</th><th>Case 2</th><th>Case 3</th></tr>
+      <tr><td>Ridge (α)</td><td>100</td><td>178</td><td>0.01</td></tr>
+      <tr><td>Lasso (α)</td><td>0.18</td><td>0.01</td><td>0.0001</td></tr>
+      <tr><td>Elastic Net (α, l1 ratio)</td><td>0.03, 0.3</td><td>0.1, 0.7</td><td>0.0001, 0.1</td></tr>
+      <tr><td>Random Forest (depth, min leaf, inputs per split)</td><td>5, 50, all</td><td>12, 1, 33%</td><td>12, 1, 67%</td></tr>
+      <tr><td>AdaBoost (tree depth, learning rate, loss, rounds)</td><td>4, 0.01, square, 17</td><td>5, 0.1, square, 56</td><td>5, 1.0, linear, 17</td></tr>
+    </table></div>
+  </section>
+
+  <section id="evaluation">
+    <h2>Evaluation</h2>
+    <ul>
+      <li><b>Chronological split by target day:</b> train 15 Oct – 14 Jan (92 days), validation 15 Jan – 7 Feb (24 days),
+        test 8 – 14 Feb (7 days). Models only ever learn from the past; test is used once, at the end. A random split
+        would put later days in training and let the model "see the future".</li>
+      <li><b>Daytime only</b> (07:00–18:15): at night every model is trivially right, which would hide real differences.</li>
+      <li><b>Metrics</b> as % of the 21.5 MW capacity: MAE, RMSE, R², and the share of blocks within ±7% of capacity
+        (the regulator's tolerance). Errors are divided by capacity, not by actual power, because actual power is
+        near 0 at sunrise and percentage errors such as MAPE would explode.</li>
+      <li><b>Skill</b> = 1 − RMSE<sub>model</sub> / RMSE<sub>persistence</sub>: 0 means no better than "tomorrow = today".
+        The 90% interval comes from resampling the days 1,000 times; a model is clearly better only if the whole interval is above 0.</li>
+    </ul>
+  </section>
+
+  <section id="results">
+    <h2>Results</h2>
+    <div class="controls">
+      <label>Inputs</label>
+      <div class="seg" id="res-case">
+        <button data-v="Case 1">Case 1 · yesterday's power</button>
+        <button data-v="Case 2" class="on">Case 2 · + yesterday's weather</button>
+        <button data-v="Case 3">Case 3 · + tomorrow's weather</button>
+      </div>
+    </div>
+    <p class="caption case-note" id="res-case-note"></p>
+    <div class="controls">
+      <label>Data</label>
+      <div class="seg" id="res-split"><button data-v="train">Train</button><button data-v="val">Validation</button><button data-v="test" class="on">Test</button></div>
+      <label>Rank by</label>
+      <div class="seg" id="res-rank"><button data-v="nRMSE" class="on">RMSE</button><button data-v="nMAE">MAE</button><button data-v="r2">R²</button></div>
+    </div>
+    <p class="caption" id="res-split-note"></p>
+    <div class="table-scroll"><table id="res-table"></table></div>
+    <p class="caption">Errors are % of capacity. Shaded rows are the baselines, shown for reference and not ranked.</p>
+    <div class="controls">
+      <button class="pill" data-jump="best">Show the best day for this case</button>
+      <button class="pill" data-jump="worst">Show the worst day for this case</button>
+      <span class="caption">Opens it in the day explorer below (ranked by the learning models' average daily MAE).</span>
+    </div>
+    <div class="callout" id="res-note"></div>
+    <div class="grid2">
+      <div><div id="skill-chart" class="chart" style="height:320px"></div>
+        <p class="caption">Skill vs persistence for the selected data split, with 90% intervals. Above 0 = better than "tomorrow = today".</p></div>
+      <div><div id="split-chart" class="chart" style="height:320px"></div>
+        <p class="caption">The selected case across train, validation and test. A big drop from train to validation means overfitting.</p></div>
+    </div>
+    <h3>What the results say</h3>
+    <ul>
+      <li><b>With only yesterday's data (Cases 1–2), nothing reliably beats persistence.</b> Small validation gains turn
+        negative on the test week, and every test interval includes zero or falls below it.</li>
+      <li><b>Penalties did not help.</b> Ridge, Lasso and Elastic Net score within about 1% of plain linear regression; Lasso
+        only drops the wind inputs.</li>
+      <li><b>With tomorrow's weather (Case 3), the tree models pull ahead</b> because they can follow the plant's midday
+        plateau. Random Forest is the only model whose test gain is clearly above zero.</li>
+      <li><b>R² is high for every model</b> (88–97%), even persistence, because the daily sun curve explains most of the
+        variation. It ranks models much like RMSE but separates them far less, so skill and RMSE are the better guides.</li>
+    </ul>
+    <h3>Which inputs does the best model use?</h3>
+    <div id="imp-chart" class="chart" style="height:300px"></div>
+    <p class="caption">Random Forest, permutation importance on validation: how much the validation RMSE rises (% of capacity)
+      when one input is shuffled. In Case 3 almost everything comes from tomorrow's sunlight; wind adds nothing in either case.
+      This shows what the model relies on, not what causes the plant's output.</p>
+  </section>
+
+  <section id="explorer">
+    <h2>Day explorer</h2>
+    <p>Pick any day to compare the actual power with the forecasts. The shaded band is ±7% of capacity.
+      Click a model in the legend to hide or show it.</p>
+    <div class="controls">
+      <label>Data</label>
+      <div class="seg" id="day-split"><button data-v="train">Train</button><button data-v="val" class="on">Validation</button><button data-v="test">Test</button></div>
+      <button class="arrow" id="day-prev" aria-label="Previous day">◀</button>
+      <select id="day-select"></select>
+      <button class="arrow" id="day-next" aria-label="Next day">▶</button>
+      <button class="pill" id="day-best">Best day</button>
+      <button class="pill" id="day-worst">Worst day</button>
+    </div>
+    <div class="controls">
+      <label>Inputs</label>
+      <div class="seg" id="day-case">
+        <button data-v="Case 1">Case 1 · yesterday's power</button>
+        <button data-v="Case 2" class="on">Case 2 · + yesterday's weather</button>
+        <button data-v="Case 3">Case 3 · + tomorrow's weather</button>
+      </div>
+    </div>
+    <p class="caption" id="day-split-note"></p>
+    <div id="day-chart" class="chart"></div>
+    <div class="table-scroll"><table id="day-table"></table></div>
+    <p class="caption">Try validation day 26 Jan (cloudy) and then 27 Jan (clear): persistence copies yesterday, so it misses in
+      opposite directions. Switching to Case 3 shows how much a weather forecast would help.</p>
+  </section>
+
+  <section id="limitations">
+    <h2>Errors and limitations</h2>
+    <ul>
+      <li><b>Weather changes are the main error:</b> 26–27 Jan are the hardest days for every model without tomorrow's weather.</li>
+      <li><b>Linear models over-forecast at midday,</b> because the plant levels off while a straight line keeps rising.</li>
+      <li><b>Overfitting:</b> in Case 2, Random Forest fits training far better than validation and loses to persistence on test.</li>
+      <li>One plant and one winter; the test set is only 7 calm days, so its intervals are wide.</li>
+      <li>Case 3 uses measured weather; a real forecast would use weather predictions, which have their own errors.</li>
+      <li>The forecast is assumed to be issued after day D ends; real schedules are submitted earlier.</li>
+      <li>Wind direction is on an unknown 0–40 scale and was used as recorded.</li>
+      <li>These are forecasts, not causes: which inputs a model relies on says nothing about what drives the plant.</li>
+    </ul>
+  </section>
+
+  <section id="conclusion">
+    <h2>Conclusion</h2>
+    <p>In a clear winter, "tomorrow = today" is very hard to beat with yesterday's data alone. The useful gain comes from
+      knowing tomorrow's weather, and from a model that can follow the plant's non-linear midday plateau: with both,
+      Random Forest cuts the error by about a fifth on the test week. A practical next step is to replace the measured
+      future weather with real numerical weather forecasts.</p>
+  </section>
+
+  <section id="reproduce">
+    <h2>Reproduce</h2>
+    <p>How to rerun the project and get the same numbers:</p>
+    <ol>
+      <li><code>src/build_clean_winter.py</code> builds the clean dataset from the raw monthly exports.</li>
+      <li>Run each model notebook in <code>src/</code> (any order).</li>
+      <li>Run <code>src/summary.ipynb</code> last; it re-scores every model and writes the data this page reads.</li>
+    </ol>
+    <p>Setup, data access, split details and the AI-use disclosure are in the <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335#readme">repository README</a>.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">Dhanraj Visapara (24110106) · ES 335 course project. Every number on this page is exported by the
+    project notebooks. Power is shown as a fraction of the plant's 21.5 MW capacity; no raw plant data is published.
+    AI tools were used for coding and editing help; see the repository README for the full AI-use disclosure and references.</div>
+</footer>
+
+<script src="assets/home.js"></script>
+</body>
+</html>
