@@ -98,8 +98,9 @@ function skillBars(rows, name, color) {
 function drawSkillCharts() {
   const pick = (c, s) => LEARNING.map((m) => results.rows.find((r) => r.model === m && r.case === c && r.split === s));
   const layout = (title) => ({
-    margin: { t: 30, r: 10, b: 60, l: 55 }, barmode: "group", title: { text: title, font: { size: 13 } },
-    yaxis: { title: "Skill vs persistence (%)", zeroline: true, zerolinewidth: 2 }, legend: { orientation: "h", y: -0.25 },
+    margin: { t: 60, r: 10, b: 60, l: 55 }, barmode: "group", title: { text: title, font: { size: 13 }, y: 0.97 },
+    yaxis: { title: "Skill vs persistence (%)", zeroline: true, zerolinewidth: 2 },
+    xaxis: { automargin: true }, legend: { orientation: "h", x: 0, y: 1, yanchor: "bottom" },
   });
   Plotly.react("skill-chart", ["Case 1", "Case 2", "Case 3"].map((c) => skillBars(pick(c, state.resSplit), c, CASE_COLORS[c])),
     layout(`All cases · ${SPLIT_NAMES[state.resSplit]}`), PLAIN);
@@ -147,7 +148,7 @@ function drawDay() {
   Plotly.react("day-chart", traces, {
     margin: { t: 10, r: 10, b: 45, l: 55 },
     xaxis: { title: "Hour of day", dtick: 1 }, yaxis: { title: "Power (% of capacity)", rangemode: "tozero" },
-    legend: { orientation: "h", y: -0.2 }, hovermode: "x unified",
+    legend: { orientation: "h", x: 0, y: 1, yanchor: "bottom" }, hovermode: "x unified",
   }, PLAIN);
 
   const scored = results.models.map((m) => ({ m, s: d.scores[key(m, state.dayCase)] })).filter((r) => r.s)
