@@ -87,3 +87,10 @@ Confirmed choices, so the code, website and viva answers stay consistent.
 - 2026-11-14: Train / Validation / Test tabs on both the results table and the day explorer (`days.json` now holds all 122 scored days). Training-day scores are labelled as optimistic, since the models were fitted on them. Case buttons carry a short description of their inputs.
 - 2026-11-14: Page additions for the rubric: author line (Dhanraj Visapara, 24110106), repo link placeholder, variables table, model rationale and assumptions, settings chosen on validation, scope-of-claim sentence, why not a random split or MAPE, AI-use note in the footer. New interactions: best/worst day buttons (in Results they jump to the day explorer; a day's difficulty is the learning models' average daily MAE for the chosen case and split), skill charts with 90% intervals (all cases for one split; one case across train/validation/test), and Random Forest input importance (Case 2 vs Case 3).
 - 2026-11-14: GitHub repo `Dhanraj-24110106/solar-forecasting-es335` (public, needed for free GitHub Pages); site served from `main` → `/docs` at https://dhanraj-24110106.github.io/solar-forecasting-es335/. The empty `Regression.py` and the archived model pages were deleted.
+
+## Website redesign (2026-11-15, user's request: "too much text, looks AI-made")
+- Visual-first single page. Hero is a "sun calendar": the whole winter as a heatmap (days × 15-minute blocks) that doubles as the day picker.
+- A sticky control bar holds two global switches (inputs case, data split) that drive every chart.
+- Charts: one-day forecasts with model toggles, ranking dot plot (skill with 90% intervals; RMSE, MAE or R²), case 1→3 slope chart, train→validation→test slope chart, daily error map, power vs sunlight, Random Forest importance, split timeline.
+- All rubric sections kept, text cut to short captions; details behind "More detail" toggles.
+- Palette from dawn-to-noon light (indigo, rose, saffron, pale yellow on a cool salt-white); one typeface, Archivo, using its width axis.
