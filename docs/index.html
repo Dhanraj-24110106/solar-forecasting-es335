@@ -108,23 +108,76 @@
     </div>
   </section>
 
+  <section id="experiments" aria-labelledby="h-exp">
+    <h2 id="h-exp">Three experiments to run yourself</h2>
+    <p class="lead">Each one tests an idea the results above depend on. Change the setting and the model is re-scored.</p>
+
+    <article class="exp">
+      <div class="exp-text">
+        <h3>How good must the weather forecast be?</h3>
+        <p>Case 3 is told tomorrow's sunlight exactly. No real forecast is that good. Make the forecast worse and watch each
+          model's lead over <q>tomorrow = today</q> shrink.</p>
+        <label class="dial" for="fe-level">Sunlight forecast error
+          <input type="range" id="fe-level" min="0" max="8" step="1" value="0">
+          <output id="fe-out" for="fe-level"></output></label>
+        <div class="switch small" id="fe-split" role="radiogroup" aria-label="Days scored">
+          <button role="radio" data-v="val">Validation days</button><button role="radio" data-v="test">Test days</button>
+        </div>
+        <p class="exp-result" id="fe-result"></p>
+        <p class="caption">Each day's sunlight is multiplied by a random factor (the same all day, since forecasts tend to be wrong for
+          a whole day); skill is averaged over 30 random draws. The models are the case 3 models, unchanged.</p>
+      </div>
+      <div id="fe-chart" class="chart mid" role="img" aria-label="Skill against sunlight forecast error"></div>
+    </article>
+
+    <article class="exp">
+      <div class="exp-text">
+        <h3>A line against a tree</h3>
+        <p>Power rises with sunlight, then levels off. Give a regression tree more leaves and it bends to follow the curve;
+          the straight line cannot. Give it too many and it starts chasing noise.</p>
+        <label class="dial" for="tree-leaves">Leaves in the tree
+          <input type="range" id="tree-leaves" min="1" max="60" step="1" value="1">
+          <output id="tree-out" for="tree-leaves"></output></label>
+        <p class="exp-result" id="tree-result"></p>
+        <p class="caption">Fitted live in your browser on 1,000 training blocks and checked on 500 others it has not seen. One input
+          only (sunlight at that block), so the errors are larger than the full models'.</p>
+      </div>
+      <div class="exp-charts">
+        <div id="tree-chart" class="chart mid" role="img" aria-label="Power against sunlight with a line and a tree"></div>
+        <div id="tree-curve" class="chart small" role="img" aria-label="Error against number of leaves"></div>
+      </div>
+    </article>
+
+    <article class="exp">
+      <div class="exp-text">
+        <h3>Break the evaluation</h3>
+        <p>The models are tested on days after the ones they learned from. Shuffle the data instead, so training and testing
+          are mixed in time, and the same models suddenly look much better. They are not: they have seen the answer's neighbours.</p>
+        <div class="switch small" id="leak-scheme" role="radiogroup" aria-label="How the data is divided">
+          <button role="radio" data-v="chronological">By date (ours)</button>
+          <button role="radio" data-v="shuffled days">Shuffled days</button>
+          <button role="radio" data-v="shuffled blocks">Shuffled blocks</button>
+        </div>
+        <p class="exp-result" id="leak-result"></p>
+        <p class="caption">Same models and settings; only the split changes. Uses the inputs chosen in the bar at the top. Shuffled
+          results are averaged over 5 shuffles. Part of the first jump is also that shuffled test days come from the whole
+          winter, not the calm final week; the step from shuffled days to shuffled blocks isolates the leakage. None of these
+          shuffled scores is a result to report.</p>
+      </div>
+      <div id="leak-chart" class="chart mid" role="img" aria-label="Skill under each way of dividing the data"></div>
+    </article>
+  </section>
+
   <section id="errors" aria-labelledby="h-errors">
     <h2 id="h-errors">Where the forecasts go wrong</h2>
     <div id="error-map" class="chart" role="img" aria-label="Daily error of every model on every day of the selected split"></div>
     <p class="caption">Each cell is one model on one day; darker means a bigger error. Columns that are dark for everyone are weather
       changes no model saw coming. Click a cell to open that day above.</p>
-    <div class="pair">
-      <figure>
-        <div id="plateau-chart" class="chart mid" role="img" aria-label="Power against sunlight"></div>
-        <figcaption><b>Why lines lose to trees.</b> Power climbs with sunlight, then flattens near 80% of capacity. A straight line
-          keeps rising and over-forecasts at midday; trees can follow the bend.</figcaption>
-      </figure>
-      <figure>
-        <div id="importance-chart" class="chart mid" role="img" aria-label="Random Forest input importance"></div>
-        <figcaption><b>What the forest relies on.</b> Rise in validation error when one input is shuffled. With tomorrow's
-          weather, sunlight is almost everything; wind never matters.</figcaption>
-      </figure>
-    </div>
+    <figure class="solo">
+      <div id="importance-chart" class="chart mid" role="img" aria-label="Random Forest input importance"></div>
+      <figcaption><b>What the forest relies on.</b> Rise in validation error when one input is shuffled. With tomorrow's
+        weather, sunlight is almost everything; wind never matters.</figcaption>
+    </figure>
   </section>
 
   <section id="method" aria-labelledby="h-method" class="method">
@@ -206,8 +259,9 @@
     <h2 id="h-conclusion">Conclusion</h2>
     <p>Yesterday's data cannot tell a model about tomorrow's clouds, so in a clear winter nothing reliably beats
       <q>tomorrow = today</q>. Knowing tomorrow's weather changes that, and a model that can follow the plant's midday plateau
-      makes the most of it: Random Forest cuts the test error by about a fifth. The practical next step is to feed in real
-      weather forecasts.</p>
+      makes the most of it: Random Forest cuts the test error by about a fifth. That lead survives only while the
+      sunlight forecast is accurate to within roughly 15 to 28%, depending on the period. The practical next step is to
+      feed in real weather forecasts.</p>
   </section>
 
   <section id="reproduce" aria-labelledby="h-reproduce" class="reproduce">

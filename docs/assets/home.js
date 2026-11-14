@@ -298,30 +298,6 @@ function drawErrorMap() {
 }
 
 // ---------- Data charts ----------
-function drawPlateau() {
-  const xs = data.scatter.ghi_next, ys = data.scatter.power.map((v) => 100 * v);
-  const n = xs.length, mx = xs.reduce((a, v) => a + v, 0) / n, my = ys.reduce((a, v) => a + v, 0) / n;
-  const slope = xs.reduce((a, v, i) => a + (v - mx) * (ys[i] - my), 0) / xs.reduce((a, v) => a + (v - mx) ** 2, 0);
-  const bins = [];
-  for (let lo = 0; lo < 950; lo += 50) {
-    const pts = ys.filter((_, i) => xs[i] >= lo && xs[i] < lo + 50);
-    if (pts.length > 10) bins.push([lo + 25, pts.reduce((a, v) => a + v, 0) / pts.length]);
-  }
-  Plotly.react("plateau-chart", [
-    { x: xs, y: ys, mode: "markers", type: "scattergl", marker: { size: 4, color: "#4b2c6b", opacity: 0.22 }, hoverinfo: "skip" },
-    { x: [0, 950], y: [my - slope * mx, my + slope * (950 - mx)], mode: "lines", line: { color: "#2b4c8c", width: 2.5, dash: "dash" }, hoverinfo: "skip" },
-    { x: bins.map((b) => b[0]), y: bins.map((b) => b[1]), mode: "lines", line: { color: "#f08a24", width: 4, shape: "spline" },
-      hovertemplate: "GHI %{x:.0f}: average %{y:.0f}%<extra></extra>" },
-  ], base({
-    xaxis: axis({ title: { text: "Sunlight, GHI in W/m²" }, range: [0, 950] }),
-    yaxis: axis({ title: { text: "Power, % of capacity" }, range: [0, 100] }),
-    annotations: [
-      { x: 900, y: my + slope * (900 - mx), text: "straight line", showarrow: false, yshift: 14, xanchor: "right", font: { color: "#2b4c8c" } },
-      { x: bins[bins.length - 1][0], y: bins[bins.length - 1][1], text: "actual average", showarrow: false, yshift: -16, xanchor: "right", font: { color: "#c26a12" } },
-    ],
-  }), CONFIG);
-}
-
 function drawImportance() {
   const imp = rf[state.case].importance;
   const pretty = (n) => n.replace("power_D", "Power, yesterday").replace(/_D\+1$/, ", tomorrow").replace(/_D$/, ", yesterday")
@@ -352,6 +328,197 @@ function drawSplitStrip() {
   }), CONFIG);
 }
 
+// ================= Experiments =================
+let exps;
+const exp = { feLevel: 0, feSplit: "val", leaves: 1, scheme: "chronological" };
+
+// ---- 1. Forecast error ----
+function breakEven(levels, skill) {
+  // first sunlight error at which skill crosses zero (linear interpolation); null if it never does
+  for (let i = 1; i < levels.length; i++) {
+    if (skill[i - 1] > 0 && skill[i] <= 0) return levels[i - 1] + (levels[i] - levels[i - 1]) * (skill[i - 1] / (skill[i - 1] - skill[i]));
+  }
+  return skill[0] <= 0 ? 0 : null;
+}
+
+function drawForecastError() {
+  const fe = exps.forecast_error, L = fe.levels, sigma = L[exp.feLevel];
+  const shown = ["MLR", "Random Forest", "AdaBoost"]; // Ridge, Lasso and Elastic Net sit on top of MLR here
+  const traces = shown.map((m) => ({
+    x: L, y: fe.skill[m][exp.feSplit], mode: "lines", name: m, line: { color: STYLE[m].color, width: 2.6 },
+    hovertemplate: `${m}<br>error %{x}%: skill %{y:.1f}%<extra></extra>`,
+  }));
+  traces.push({ x: shown.map(() => sigma), y: shown.map((m) => fe.skill[m][exp.feSplit][exp.feLevel]), mode: "markers",
+    marker: { size: 13, color: shown.map((m) => STYLE[m].color), line: { color: SALT, width: 2 } }, hoverinfo: "skip" });
+  const label = { MLR: "linear models" };
+  Plotly.react("fe-chart", traces, base({
+    margin: { t: 16, r: 16, b: 46, l: 56 },
+    xaxis: axis({ title: { text: "Sunlight forecast error (standard deviation, %)" }, range: [-1, 51], showgrid: false }),
+    yaxis: axis({ title: { text: "Skill vs persistence, %" }, range: [-60, 60], zeroline: true, zerolinewidth: 2 }),
+    shapes: [
+      { type: "line", xref: "x", yref: "paper", x0: sigma, x1: sigma, y0: 0, y1: 1, line: { color: INK, width: 1.5, dash: "dot" } },
+      { type: "rect", xref: "paper", yref: "y", x0: 0, x1: 1, y0: -60, y1: 0, fillcolor: "rgba(178,58,106,0.07)", line: { width: 0 }, layer: "below" },
+    ],
+    annotations: [
+      ...shown.map((m) => ({ x: 0, y: fe.skill[m][exp.feSplit][0], xanchor: "left", xshift: 8, yshift: m === "AdaBoost" ? -13 : 12, showarrow: false,
+        text: label[m] || m, font: { size: 12, color: STYLE[m].color } })),
+      { xref: "paper", yref: "y", x: 1, y: -55, xanchor: "right", showarrow: false, text: "worse than “tomorrow = today”", font: { size: 12, color: "#b23a6a" } },
+    ],
+  }), CONFIG);
+
+  document.getElementById("fe-out").textContent = sigma === 0 ? "0% (perfect)" : `±${sigma}%`;
+  const still = LEARNING.filter((m) => fe.skill[m][exp.feSplit][exp.feLevel] > 0);
+  const be = (m) => { const b = breakEven(L, fe.skill[m][exp.feSplit]); return b == null ? "more than 50%" : `about ${Math.round(b)}%`; };
+  document.getElementById("fe-result").innerHTML =
+    `With a sunlight error of ${sigma}%, <b>${still.length} of 6</b> models still beat <q>tomorrow = today</q> on ${SPLIT_NAME[exp.feSplit]} days` +
+    (still.length ? ` (best: ${still.sort((a, b) => fe.skill[b][exp.feSplit][exp.feLevel] - fe.skill[a][exp.feSplit][exp.feLevel])[0]}, ${signed(fe.skill[still[0]][exp.feSplit][exp.feLevel])}%).` : ".") +
+    ` Random Forest breaks even at ${be("Random Forest")} error, the linear models at ${be("MLR")}.`;
+}
+
+// ---- 2. Line against tree ----
+const tree = {};
+function setupTree() {
+  const xs = data.scatter.ghi_next, ys = data.scatter.power.map((v) => 100 * v);
+  const N_FIT = 1000;
+  const order = xs.slice(0, N_FIT).map((_, i) => i).sort((a, b) => xs[a] - xs[b]);
+  tree.fx = order.map((i) => xs[i]); tree.fy = order.map((i) => ys[i]);          // fitting blocks, sorted by sunlight
+  tree.hx = xs.slice(N_FIT); tree.hy = ys.slice(N_FIT);                             // held-out blocks
+  // least-squares line on the fitting blocks
+  const n = tree.fx.length, mx = tree.fx.reduce((a, v) => a + v, 0) / n, my = tree.fy.reduce((a, v) => a + v, 0) / n;
+  tree.slope = tree.fx.reduce((a, v, i) => a + (v - mx) * (tree.fy[i] - my), 0) / tree.fx.reduce((a, v) => a + (v - mx) ** 2, 0);
+  tree.icpt = my - tree.slope * mx;
+  // prefix sums for fast squared-error of any range [a, b)
+  const s1 = [0], s2 = [0];
+  tree.fy.forEach((v) => { s1.push(s1[s1.length - 1] + v); s2.push(s2[s2.length - 1] + v * v); });
+  const sse = (a, b) => (s2[b] - s2[a]) - (s1[b] - s1[a]) ** 2 / (b - a);
+  const MIN = 5;
+  const bestSplit = (a, b) => {
+    let best = null;
+    for (let k = a + MIN; k <= b - MIN; k++) {
+      if (tree.fx[k - 1] === tree.fx[k]) continue;
+      const gain = sse(a, b) - sse(a, k) - sse(k, b);
+      if (!best || gain > best.gain) best = { k, gain };
+    }
+    return best;
+  };
+  // grow best-first: always split the leaf whose best question removes the most squared error
+  let leaves = [{ a: 0, b: n, split: bestSplit(0, n) }];
+  tree.cuts = []; // cut positions in the order the tree adds them
+  while (leaves.length < 60) {
+    const pick = leaves.filter((l) => l.split).sort((p, q) => q.split.gain - p.split.gain)[0];
+    if (!pick) break;
+    leaves = leaves.filter((l) => l !== pick);
+    leaves.push({ a: pick.a, b: pick.split.k, split: bestSplit(pick.a, pick.split.k) }, { a: pick.split.k, b: pick.b, split: bestSplit(pick.split.k, pick.b) });
+    tree.cuts.push(pick.split.k);
+  }
+  tree.model = (k) => {
+    const edges = [0, ...tree.cuts.slice(0, k - 1).sort((p, q) => p - q), n];
+    const segs = edges.slice(0, -1).map((a, i) => ({ lo: i === 0 ? -Infinity : (tree.fx[a - 1] + tree.fx[a]) / 2, mean: (s1[edges[i + 1]] - s1[a]) / (edges[i + 1] - a) }));
+    return (x) => { let m = segs[0].mean; for (const s of segs) { if (x > s.lo) m = s.mean; else break; } return m; };
+  };
+  const rmse = (f, X, Y) => Math.sqrt(X.reduce((a, x, i) => a + (f(x) - Y[i]) ** 2, 0) / X.length);
+  tree.line = (x) => tree.icpt + tree.slope * x;
+  tree.lineFit = rmse(tree.line, tree.fx, tree.fy); tree.lineHeld = rmse(tree.line, tree.hx, tree.hy);
+  tree.ks = Array.from({ length: tree.cuts.length + 1 }, (_, i) => i + 1);
+  tree.fitErr = tree.ks.map((k) => rmse(tree.model(k), tree.fx, tree.fy));
+  tree.heldErr = tree.ks.map((k) => rmse(tree.model(k), tree.hx, tree.hy));
+  tree.bestK = tree.ks[tree.heldErr.indexOf(Math.min(...tree.heldErr))];
+  document.getElementById("tree-leaves").max = tree.ks.length;
+}
+
+function drawTree() {
+  const k = exp.leaves, f = tree.model(k);
+  const grid = Array.from({ length: 476 }, (_, i) => i * 2);
+  Plotly.react("tree-chart", [
+    { x: tree.fx, y: tree.fy, mode: "markers", type: "scattergl", marker: { size: 4, color: "#4b2c6b", opacity: 0.2 }, hoverinfo: "skip" },
+    { x: [0, 950], y: [tree.line(0), tree.line(950)], mode: "lines", line: { color: "#2b4c8c", width: 2.5, dash: "dash" }, hoverinfo: "skip" },
+    { x: grid, y: grid.map(f), mode: "lines", line: { color: "#f08a24", width: 3.5, shape: "hv" }, hovertemplate: "GHI %{x}: tree says %{y:.0f}%<extra></extra>" },
+  ], base({
+    margin: { t: 10, r: 16, b: 44, l: 56 },
+    xaxis: axis({ title: { text: "Sunlight at that block, GHI in W/m²" }, range: [0, 950] }),
+    yaxis: axis({ title: { text: "Power, % of capacity" }, range: [0, 100] }),
+    annotations: [
+      { x: 930, y: Math.min(98, tree.line(930)), text: "straight line", showarrow: false, xanchor: "right", yshift: 12, font: { color: "#2b4c8c" } },
+      { x: 930, y: f(930), text: `tree, ${k} ${k === 1 ? "leaf" : "leaves"}`, showarrow: false, xanchor: "right", yshift: -14, font: { color: "#c26a12" } },
+    ],
+  }), CONFIG);
+  Plotly.react("tree-curve", [
+    { x: tree.ks, y: tree.fitErr, mode: "lines", line: { color: "#8a93a5", width: 2 }, hovertemplate: "%{x} leaves, blocks it learned from: %{y:.2f}<extra></extra>" },
+    { x: tree.ks, y: tree.heldErr, mode: "lines", line: { color: "#f08a24", width: 2.6 }, hovertemplate: "%{x} leaves, unseen blocks: %{y:.2f}<extra></extra>" },
+    { x: [k], y: [tree.heldErr[k - 1]], mode: "markers", marker: { size: 12, color: "#f08a24", line: { color: SALT, width: 2 } }, hoverinfo: "skip" },
+  ], base({
+    margin: { t: 8, r: 16, b: 40, l: 56 },
+    xaxis: axis({ title: { text: "Leaves" }, showgrid: false }),
+    yaxis: axis({ title: { text: "RMSE, % of capacity" } }),
+    shapes: [{ type: "line", xref: "paper", yref: "y", x0: 0, x1: 1, y0: tree.lineHeld, y1: tree.lineHeld, line: { color: "#2b4c8c", width: 1.5, dash: "dash" } }],
+    annotations: [
+      { xref: "paper", x: 1, y: tree.lineHeld, text: "straight line", showarrow: false, xanchor: "right", yshift: 9, font: { size: 12, color: "#2b4c8c" } },
+      { x: tree.ks[tree.ks.length - 1], y: tree.fitErr[tree.ks.length - 1], text: "blocks it learned from", showarrow: false, xanchor: "right", yshift: -10, font: { size: 12, color: "#8a93a5" } },
+      { x: tree.ks[tree.ks.length - 1], y: tree.heldErr[tree.ks.length - 1], text: "unseen blocks", showarrow: false, xanchor: "right", yshift: 10, font: { size: 12, color: "#c26a12" } },
+    ],
+  }), CONFIG);
+  document.getElementById("tree-out").textContent = k;
+  const held = tree.heldErr[k - 1], gap = held - tree.fitErr[k - 1];
+  const verdict = k === 1 ? "With one leaf the tree predicts the same value everywhere: far worse than the line."
+    : held > tree.lineHeld ? "Too few leaves to follow the curve: the tree still loses to the line."
+    : k > tree.bestK + 8 ? `Past about ${tree.bestK} leaves the error on unseen blocks stops falling while the fit keeps improving: the extra leaves are fitting noise.`
+    : "The staircase now bends with the plateau and beats the line on blocks it has never seen.";
+  document.getElementById("tree-result").innerHTML =
+    `Error on unseen blocks: tree <b>${held.toFixed(2)}%</b>, straight line <b>${tree.lineHeld.toFixed(2)}%</b>. ${verdict}` +
+    (gap >= 0.05 ? ` It does ${gap.toFixed(2)} points better on the blocks it learned from than on unseen ones.` : "");
+}
+
+// ---- 3. Break the evaluation ----
+function drawLeakage() {
+  const rowsOf = (scheme) => LEARNING.map((m) => exps.leakage.find((r) => r.model === m && r.case === state.case && r.scheme === scheme));
+  const honest = rowsOf("chronological"), now = rowsOf(exp.scheme);
+  const all = exps.leakage.filter((r) => r.case === state.case).map((r) => r.skill);
+  const traces = [
+    { type: "scatter", mode: "markers", y: LEARNING, x: honest.map((r) => r.skill), marker: { size: 13, color: SALT, line: { color: INK, width: 2 } },
+      hovertemplate: "%{y}, split by date: %{x:.1f}%<extra></extra>" },
+  ];
+  const shapes = [];
+  if (exp.scheme !== "chronological") {
+    traces.push({ type: "scatter", mode: "markers+text", y: LEARNING, x: now.map((r) => r.skill),
+      marker: { size: 15, color: LEARNING.map((m) => STYLE[m].color) }, text: now.map((r) => signed(r.skill)), textposition: "middle right",
+      textfont: { size: 13, color: INK }, cliponaxis: false, hovertemplate: `%{y}, ${exp.scheme}: %{x:.1f}%<extra></extra>` });
+    LEARNING.forEach((m, i) => shapes.push({ type: "line", xref: "x", yref: "y", x0: honest[i].skill, x1: now[i].skill, y0: m, y1: m,
+      line: { color: STYLE[m].color, width: 3 }, layer: "below" }));
+  }
+  Plotly.react("leak-chart", traces, base({
+    margin: { t: 30, r: 56, b: 46, l: 110 },
+    xaxis: axis({ title: { text: `Skill vs persistence, % (${state.case.toLowerCase()} inputs)` }, zeroline: true, zerolinewidth: 2,
+      range: [Math.min(...all, 0) - 6, Math.max(...all, 0) + 12] }),
+    yaxis: axis({ autorange: "reversed", showgrid: false }),
+    shapes,
+    annotations: [{ xref: "paper", yref: "paper", x: 0, y: 1.08, xanchor: "left", showarrow: false,
+      text: exp.scheme === "chronological" ? "open circles: split by date, the honest score" : `open circles: split by date. filled: ${exp.scheme}`,
+      font: { size: 12, color: SOFT } }],
+  }), CONFIG);
+
+  const rfH = honest[LEARNING.indexOf("Random Forest")].skill, rfN = now[LEARNING.indexOf("Random Forest")].skill;
+  const days_ = rowsOf("shuffled days")[LEARNING.indexOf("Random Forest")].skill, blocks_ = rowsOf("shuffled blocks")[LEARNING.indexOf("Random Forest")].skill;
+  const text = {
+    "chronological": `Split by date, Random Forest scores <b>${signed(rfH)}%</b> against <q>tomorrow = today</q>. This is the only score that matches real use: train on the past, forecast the future.`,
+    "shuffled days": `Shuffle whole days and Random Forest jumps from ${signed(rfH)}% to <b>${signed(rfN)}%</b>. Its test days are now scattered through the winter, with training days on both sides of each one.`,
+    "shuffled blocks": `Shuffle individual blocks and Random Forest reaches <b>${signed(rfN)}%</b>. Going from shuffled days (${signed(days_)}%) to shuffled blocks (${signed(blocks_)}%) is pure leakage: the model has trained on other blocks of the very day it is tested on.`,
+  };
+  document.getElementById("leak-result").innerHTML = text[exp.scheme];
+}
+
+function setupExperiments() {
+  setupTree();
+  const fe = document.getElementById("fe-level");
+  fe.addEventListener("input", () => { exp.feLevel = +fe.value; drawForecastError(); });
+  switchGroup("fe-split", exp.feSplit, (v) => { exp.feSplit = v; drawForecastError(); });
+  const tl = document.getElementById("tree-leaves");
+  tl.addEventListener("input", () => { exp.leaves = +tl.value; drawTree(); });
+  switchGroup("leak-scheme", exp.scheme, (v) => { exp.scheme = v; drawLeakage(); });
+  drawForecastError();
+  drawTree();
+  drawLeakage();
+}
+
 // ---------- Wiring ----------
 function redrawForControls() {
   controlNote();
@@ -360,11 +527,12 @@ function redrawForControls() {
   drawSlopes();
   drawErrorMap();
   drawImportance();
+  if (exps) drawLeakage();
 }
 
-Promise.all(["results", "days", "data", "random_forest"].map((n) => fetch(`data/${n}.json`).then((r) => r.json())))
-  .then(([res, dy, dt, forest]) => {
-    results = res; days = dy; data = dt; rf = forest;
+Promise.all(["results", "days", "data", "random_forest", "experiments"].map((n) => fetch(`data/${n}.json`).then((r) => r.json())))
+  .then(([res, dy, dt, forest, ex]) => {
+    results = res; days = dy; data = dt; rf = forest; exps = ex;
     state.day = days.days.findIndex((d) => d.date === "2026-01-26");
     document.getElementById("f1").textContent = `${pct(row("Persistence", "Case 1", "test").nMAE)}%`;
     document.getElementById("f3").textContent = `${signed(row("Random Forest", "Case 3", "test").skill)}%`;
@@ -374,9 +542,9 @@ Promise.all(["results", "days", "data", "random_forest"].map((n) => fetch(`data/
     switchGroup("rank-switch", state.rank, (v) => { state.rank = v; drawRanking(); });
     drawChips();
     setupDayNav();
-    drawPlateau();
     drawSplitStrip();
     redrawForControls();
+    setupExperiments();
     document.getElementById("calendar").on("plotly_click", (ev) => {
       const i = days.days.findIndex((d) => d.date === String(ev.points[0].x).slice(0, 10));
       if (i >= 0) setDay(i, true);

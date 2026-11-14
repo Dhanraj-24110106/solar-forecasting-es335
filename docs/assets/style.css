@@ -216,3 +216,16 @@ footer { max-width: var(--wide); margin: 64px auto 0; padding: 22px 20px 48px; b
   .control { flex-wrap: nowrap; }
   .control-label { display: none; }
 }
+
+/* ---------- Experiments ---------- */
+.exp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); gap: 20px 48px; align-items: start;
+  border-top: 2px solid var(--ink); padding: 26px 0 30px; margin-top: 26px; }
+.exp-text h3 { font-size: 24px; font-weight: 800; font-variation-settings: "wdth" 118; margin-bottom: 8px; }
+.exp-charts { min-width: 0; }
+.dial { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; font-weight: 600; margin: 14px 0 12px; }
+.dial input { grid-column: 1 / -1; width: 100%; accent-color: var(--saffron); height: 28px; }
+.dial output { font-size: 22px; font-weight: 800; font-variation-settings: "wdth" 115; grid-row: 1; grid-column: 2; }
+.exp-result { font-size: 18px; line-height: 1.45; margin: 14px 0 10px; padding-left: 14px; border-left: 4px solid var(--saffron); }
+.chart.small { height: 190px; }
+figure.solo { margin-top: 40px; max-width: 720px; }
+@media (max-width: 860px) { .exp { grid-template-columns: 1fr; } }
