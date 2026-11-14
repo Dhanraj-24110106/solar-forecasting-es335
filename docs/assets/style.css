@@ -238,3 +238,21 @@ table.feat td:first-child, table.feat th:first-child { text-align: left; font-we
 table.feat td.dropped { color: var(--bad); font-weight: 700; background: #f6e3ea; }
 table.feat td.zero { color: var(--ink-soft); }
 table.feat th.grp { border-bottom: 2px solid var(--ink); color: var(--ink); }
+
+/* ---------- Chapters (flow) ---------- */
+.chapters { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 36px 0 0; padding: 14px 0; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule); }
+.chapters a { font-weight: 700; font-variation-settings: "wdth" 112; text-decoration: none; color: var(--ink); }
+.chapters a:hover { color: var(--rose); }
+section.chapter { padding-top: 72px; }
+section.chapter > h2 { font-size: clamp(32px, 4.6vw, 52px); }
+section.chapter > .lead { max-width: 62ch; }
+.chapter-body { padding-top: 8px; }
+.block { border-top: 2px solid var(--ink); padding: 26px 0 30px; margin-top: 26px; }
+.block-title { font-size: 24px; font-weight: 800; font-variation-settings: "wdth" 118; margin: 0; }
+.block .sec-head { margin-bottom: 8px; }
+.uses { font-size: 14px; color: var(--ink-soft); margin: 4px 0 10px; font-style: italic; }
+.method-grid .span { grid-column: 1 / -1; }
+#setup .method-grid { margin-top: 24px; }
+
+/* The control bar now sits inside <main>: break it out to full width. */
+main > .controls-bar { width: 100vw; margin: 28px 0 0 calc(50% - 50vw); }

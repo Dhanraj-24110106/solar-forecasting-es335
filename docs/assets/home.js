@@ -298,22 +298,6 @@ function drawErrorMap() {
 }
 
 // ---------- Data charts ----------
-function drawImportance() {
-  const imp = rf[state.case].importance;
-  const pretty = prettyInput;
-  const names = Object.keys(imp).sort((a, b) => imp[b] - imp[a]);
-  Plotly.react("importance-chart", [{
-    type: "bar", orientation: "h", y: names.map(pretty), x: names.map((n) => imp[n]),
-    marker: { color: names.map((n) => (n.endsWith("D+1") ? "#f08a24" : "#4b2c6b")) },
-    text: names.map((n) => `+${imp[n].toFixed(2)}`), textposition: "outside", cliponaxis: false, textfont: { size: 12 },
-    hovertemplate: "%{y}: +%{x:.2f} points<extra></extra>",
-  }], base({
-    margin: { t: 10, r: 50, b: 44, l: 10 },
-    xaxis: axis({ title: { text: `Rise in validation RMSE, % of capacity (${state.case.toLowerCase()})` } }),
-    yaxis: axis({ autorange: "reversed", automargin: true, showgrid: false }),
-  }), CONFIG);
-}
-
 function drawSplitStrip() {
   const e = data.energy;
   Plotly.react("split-strip", ["train", "val", "test"].map((s) => ({
@@ -518,138 +502,11 @@ function setupExperiments() {
   drawLeakage();
 }
 
-// ================= How the models learn =================
-let learnData, reg;
-const lrn = { gdMode: "raw", gdRate: 60, penModel: "Lasso", penIndex: 0, bvIndex: 0, lcIndex: 7 };
+// ---------- Inputs kept or dropped ----------
+let learnData;
 const prettyInput = (n) => n.replace("power_D", "Power, yesterday").replace(/_D\+1$/, ", tomorrow").replace(/_D$/, ", yesterday")
   .replace(/^ghi/, "Sunlight").replace(/^modt/, "Module temp.").replace(/^ambt/, "Air temp.").replace(/^wspd/, "Wind speed").replace(/^wdir/, "Wind direction");
 
-// ---- Gradient descent on the Case 1 error surface ----
-// Half the mean squared error of y = b0 + b1 x depends on the data only through five averages.
-const gd = {};
-function setupGD() {
-  const m = learnData.moments;
-  gd.sx = Math.sqrt(m.mxx - m.mx * m.mx);
-  gd.b1 = (m.mxy - m.mx * m.my) / (m.mxx - m.mx * m.mx);
-  gd.b0 = m.my - gd.b1 * m.mx;
-  gd.startLine = { b0: gd.b0 + 34, b1: gd.b1 - 0.6 };
-  resetGD();
-}
-// raw coordinates: (b0, b1).  standardised: (a, c) with y = a + c z, z = (x - mean) / spread.
-const toRaw = (p) => (lrn.gdMode === "raw" ? { b0: p[0], b1: p[1] } : { b0: p[0] - (p[1] * learnData.moments.mx) / gd.sx, b1: p[1] / gd.sx });
-const fromRaw = (l) => (lrn.gdMode === "raw" ? [l.b0, l.b1] : [l.b0 + l.b1 * learnData.moments.mx, l.b1 * gd.sx]);
-function rmseOf(p) {
-  const m = learnData.moments, { b0, b1 } = toRaw(p);
-  return Math.sqrt(Math.max(0, m.myy - 2 * b0 * m.my - 2 * b1 * m.mxy + b0 * b0 + 2 * b0 * b1 * m.mx + b1 * b1 * m.mxx));
-}
-function gradOf(p) {
-  const m = learnData.moments;
-  if (lrn.gdMode === "raw") return [p[0] + p[1] * m.mx - m.my, p[0] * m.mx + p[1] * m.mxx - m.mxy];
-  return [p[0] - m.my, p[1] - gd.b1 * gd.sx];
-}
-// Steepest and flattest curvature of the surface (eigenvalues of its 2×2 Hessian).
-function curvature() {
-  if (lrn.gdMode === "std") return { steep: 1, flat: 1 }; // a round bowl
-  const m = learnData.moments, tr = 1 + m.mxx, det = m.mxx - m.mx * m.mx, root = Math.sqrt(tr * tr - 4 * det);
-  return { steep: (tr + root) / 2, flat: (tr - root) / 2 };
-}
-const maxStep = () => 2 / curvature().steep;
-function resetGD(line) {
-  gd.path = [fromRaw(line || gd.startLine)];
-  gd.diverged = false;
-}
-function stepGD(n) {
-  const eta = (lrn.gdRate / 100) * maxStep();
-  for (let i = 0; i < n && !gd.diverged; i++) {
-    const p = gd.path[gd.path.length - 1], g = gradOf(p);
-    const q = [p[0] - eta * g[0], p[1] - eta * g[1]];
-    gd.path.push(q);
-    if (!isFinite(rmseOf(q)) || rmseOf(q) > 1e4) gd.diverged = true;
-  }
-  drawGD();
-}
-function drawGD() {
-  const best = fromRaw({ b0: gd.b0, b1: gd.b1 });
-  const raw = lrn.gdMode === "raw";
-  const spanX = 46, spanY = raw ? 0.95 : 46;
-  const xs = Array.from({ length: 70 }, (_, i) => best[0] - spanX + (i * 2 * spanX) / 69);
-  const ys = Array.from({ length: 70 }, (_, i) => best[1] - spanY + (i * 2 * spanY) / 69);
-  const z = ys.map((y) => xs.map((x) => rmseOf([x, y])));
-  const inView = gd.path.filter((p) => Math.abs(p[0] - best[0]) <= spanX * 1.5 && Math.abs(p[1] - best[1]) <= spanY * 1.5);
-  Plotly.react("gd-chart", [
-    { type: "contour", x: xs, y: ys, z, colorscale: [[0, "#ffe08a"], [0.25, "#f08a24"], [0.55, "#b23a6a"], [1, "#141b33"]],
-      contours: { start: 5, end: 60, size: 5, coloring: "heatmap" }, line: { color: "rgba(238,242,239,0.35)", width: 1 },
-      colorbar: { title: { text: "RMSE, % of capacity", side: "right", font: { size: 12 } }, thickness: 10, outlinewidth: 0 },
-      hovertemplate: (raw ? "b₀ %{x:.1f}, b₁ %{y:.2f}" : "level %{x:.1f}, slope per spread %{y:.1f}") + "<br>RMSE %{z:.1f}%<extra></extra>" },
-    { x: inView.map((p) => p[0]), y: inView.map((p) => p[1]), mode: "lines+markers", line: { color: SALT, width: 2 },
-      marker: { size: 6, color: SALT, line: { color: INK, width: 1 } }, hoverinfo: "skip" },
-    { x: [best[0]], y: [best[1]], mode: "markers", marker: { size: 13, symbol: "x", color: INK, line: { width: 2, color: INK } }, hoverinfo: "skip" },
-  ], base({
-    margin: { t: 14, r: 10, b: 46, l: 60 },
-    xaxis: axis({ title: { text: raw ? "Intercept b₀, % of capacity" : "Level: forecast on an average day, % of capacity" }, showgrid: false, range: [best[0] - spanX, best[0] + spanX] }),
-    yaxis: axis({ title: { text: raw ? "Slope b₁" : "Slope per one spread of the input" }, showgrid: false, range: [best[1] - spanY, best[1] + spanY] }),
-    annotations: [{ x: best[0], y: best[1], text: "least squares", showarrow: false, yshift: -16, font: { size: 12, color: INK }, bgcolor: "rgba(238,242,239,0.8)" }],
-  }), CONFIG);
-
-  const now = gd.path[gd.path.length - 1], line = toRaw(now), steps = gd.path.length - 1;
-  document.getElementById("gd-out").textContent = `${lrn.gdRate}%`;
-  const bestRmse = rmseOf(best), gap = rmseOf(now) - bestRmse;
-  document.getElementById("gd-result").innerHTML = gd.diverged
-    ? `<b>It diverged.</b> A step larger than the safe size overshoots the valley and each step lands further away. Lower the step size and start over.`
-    : `After <b>${steps}</b> ${steps === 1 ? "step" : "steps"}: tomorrow = ${line.b0.toFixed(2)} + ${line.b1.toFixed(3)} × today, error ${rmseOf(now).toFixed(2)}%. ` +
-      (gap < 0.005 ? `<b>Arrived</b> at the least-squares line (${gd.b0.toFixed(2)} + ${gd.b1.toFixed(3)} × today).`
-        : `Still ${gap.toFixed(2)} points above the best possible (${bestRmse.toFixed(2)}%).` + crawlNote(steps));
-}
-
-// With raw inputs the valley is thousands of times flatter along its floor than across it,
-// so after the first few steps progress is very slow. Estimate how many steps the floor needs.
-function crawlNote(steps) {
-  if (lrn.gdMode !== "raw" || steps < 10 || lrn.gdRate >= 100) return "";
-  const c = curvature(), eta = (lrn.gdRate / 100) * maxStep();
-  const needed = Math.log(1000) / (eta * c.flat);
-  return ` It dropped into the valley within a few steps and is now creeping along its floor, which is ${Math.round(c.steep / c.flat).toLocaleString()} times flatter than its walls: at this step size it needs about <b>${(Math.round(needed / 1000) * 1000).toLocaleString()} steps</b>. Switch to the standardised input to see the difference.`;
-}
-
-// ---- Penalty dial ----
-function penSeries() {
-  const blk = reg[lrn.penModel][state.case];
-  return { blk, s: blk.series[lrn.penModel === "Elastic Net" ? String(blk.chosen_l1_ratio) : "all"] };
-}
-function penChosenIndex() {
-  const { blk, s } = penSeries();
-  return s.alpha.reduce((b, v, i) => (Math.abs(Math.log(v / blk.chosen_alpha)) < Math.abs(Math.log(s.alpha[b] / blk.chosen_alpha)) ? i : b), 0);
-}
-function drawPenalty() {
-  const { blk, s } = penSeries();
-  const slider = document.getElementById("pen-alpha");
-  slider.max = s.alpha.length - 1;
-  const i = Math.min(lrn.penIndex, s.alpha.length - 1);
-  slider.value = i;
-  const names = Object.keys(s.coefs), vals = names.map((n) => 100 * s.coefs[n][i]);
-  const dropped = lrn.penModel === "Ridge" ? [] : names.filter((_, k) => vals[k] === 0);
-  const top = Math.max(...names.map((n) => Math.max(...s.coefs[n].map((v) => Math.abs(100 * v)))));
-  Plotly.react("pen-chart", [{
-    type: "bar", orientation: "h", y: names.map(prettyInput), x: vals,
-    marker: { color: vals.map((v, k) => (dropped.includes(names[k]) ? "#d9c3cc" : v >= 0 ? "#4b2c6b" : "#b23a6a")) },
-    text: vals.map((v, k) => (dropped.includes(names[k]) ? "dropped" : v.toFixed(2))), textposition: "outside", cliponaxis: false, textfont: { size: 12 },
-    hovertemplate: "%{y}: %{x:.3f}<extra></extra>",
-  }], base({
-    margin: { t: 10, r: 60, b: 46, l: 10 },
-    xaxis: axis({ title: { text: "Coefficient, % of capacity per typical change in the input" }, range: [-top * 0.35, top * 1.15], zeroline: true, zerolinewidth: 2 }),
-    yaxis: axis({ autorange: "reversed", automargin: true, showgrid: false }),
-  }), CONFIG);
-  const a = s.alpha[i];
-  document.getElementById("pen-out").textContent = a < 0.01 ? a.toExponential(0) : a >= 100 ? Math.round(a).toLocaleString() : String(+a.toPrecision(2));
-  const isChosen = i === penChosenIndex();
-  document.getElementById("pen-result").innerHTML =
-    `${lrn.penModel}, ${state.case.toLowerCase()}: <b>${names.length - dropped.length} of ${names.length}</b> inputs in use` +
-    (dropped.length ? `; dropped ${dropped.map(prettyInput).join("; ").toLowerCase()}` : "") +
-    `. Validation error ${s.val_nRMSE[i].toFixed(2)}% (training ${s.train_nRMSE[i].toFixed(2)}%).` +
-    (isChosen ? " <b>This is the α validation chose.</b>" : "") +
-    (lrn.penModel === "Elastic Net" ? ` Elastic Net is shown at its chosen mix (${Math.round(100 * blk.chosen_l1_ratio)}% Lasso-style).` : "");
-}
-
-// ---- Inputs kept or dropped ----
 function drawFeatures() {
   const f = learnData.features[state.case];
   const linear = ["MLR", "Ridge", "Lasso", "Elastic Net"], trees = ["Random Forest", "AdaBoost"];
@@ -664,108 +521,6 @@ function drawFeatures() {
   document.getElementById("feat-table").innerHTML = head + body + foot;
 }
 
-// ---- Bias and variance ----
-function drawBiasVariance() {
-  const bv = learnData.bias_variance, c = bv.cases[state.case], n = bv.tree_counts[lrn.bvIndex];
-  const rows = [
-    { name: "Linear regression", d: c.mlr },
-    { name: "One tree", d: c.forest[0] },
-    { name: `Forest of ${n} ${n === 1 ? "tree" : "trees"}`, d: c.forest[lrn.bvIndex] },
-  ];
-  const top = Math.max(c.mlr.bias2 + c.mlr.variance, c.forest[0].bias2 + c.forest[0].variance) * 1.18;
-  Plotly.react("bv-chart", [
-    { type: "bar", orientation: "h", name: "Bias²", y: rows.map((r) => r.name), x: rows.map((r) => r.d.bias2), marker: { color: "#4b2c6b" },
-      text: rows.map((r) => r.d.bias2.toFixed(1)), textposition: "inside", insidetextanchor: "middle", textfont: { color: SALT }, hovertemplate: "%{y}, bias²: %{x:.1f}<extra></extra>" },
-    { type: "bar", orientation: "h", name: "Variance", y: rows.map((r) => r.name), x: rows.map((r) => r.d.variance), marker: { color: "#f08a24" },
-      text: rows.map((r) => r.d.variance.toFixed(1)), textposition: "inside", insidetextanchor: "middle", textfont: { color: INK }, hovertemplate: "%{y}, variance: %{x:.1f}<extra></extra>" },
-  ], base({
-    barmode: "stack", margin: { t: 34, r: 16, b: 46, l: 10 },
-    xaxis: axis({ title: { text: "Expected squared error on validation, (% of capacity)²" }, range: [0, top] }),
-    yaxis: axis({ autorange: "reversed", automargin: true, showgrid: false }),
-    annotations: [
-      { xref: "paper", yref: "paper", x: 0, y: 1.1, xanchor: "left", showarrow: false, text: "■ bias² (wrong on average)", font: { size: 12, color: "#4b2c6b" } },
-      { xref: "paper", yref: "paper", x: 0.42, y: 1.1, xanchor: "left", showarrow: false, text: "■ variance (changes with the training set)", font: { size: 12, color: "#c26a12" } },
-    ],
-  }), CONFIG);
-  document.getElementById("bv-out").textContent = n;
-  const one = c.forest[0], f = c.forest[lrn.bvIndex];
-  const cut = 100 * (1 - f.variance / one.variance);
-  document.getElementById("bv-result").innerHTML =
-    `One tree: variance ${one.variance.toFixed(1)}. Averaging <b>${n}</b> ${n === 1 ? "tree" : "trees"}: variance ${f.variance.toFixed(1)}` +
-    (n > 1 ? ` (<b>${cut.toFixed(0)}% lower</b>)` : "") + `, while bias² stays near ${f.bias2.toFixed(1)}. ` +
-    `Linear regression is the opposite kind of model: variance only ${c.mlr.variance.toFixed(1)}, bias² ${c.mlr.bias2.toFixed(1)}.`;
-}
-
-// ---- Learning curve ----
-function drawLearningCurve() {
-  const lc = learnData.learning_curve, c = lc.cases[state.case], d = lc.days, n = d[lrn.lcIndex];
-  const line = (m, s, dash) => ({ x: d, y: c[m][s], mode: "lines+markers", line: { color: STYLE[m].color, width: s === "val" ? 2.6 : 1.6, dash },
-    marker: { size: s === "val" ? 6 : 4, color: STYLE[m].color }, hovertemplate: `${m}, ${s === "val" ? "validation" : "its own training days"}<br>%{x} days: %{y:.2f}%<extra></extra>` });
-  const all = ["MLR", "Random Forest"].flatMap((m) => [...c[m].val, ...c[m].train]);
-  Plotly.react("lc-chart", [
-    line("MLR", "train", "dot"), line("Random Forest", "train", "dot"), line("MLR", "val", "solid"), line("Random Forest", "val", "solid"),
-    { x: [n, n], y: [c.MLR.val[lrn.lcIndex], c["Random Forest"].val[lrn.lcIndex]], mode: "markers",
-      marker: { size: 13, color: [STYLE.MLR.color, STYLE["Random Forest"].color], line: { color: SALT, width: 2 } }, hoverinfo: "skip" },
-  ], base({
-    margin: { t: 14, r: 96, b: 46, l: 56 },
-    xaxis: axis({ title: { text: "Most recent training days used" }, showgrid: false, range: [3, 95] }),
-    yaxis: axis({ title: { text: "RMSE, % of capacity" }, range: [0, Math.max(...all, c.persistence_val) * 1.12] }),
-    shapes: [
-      { type: "line", xref: "paper", yref: "y", x0: 0, x1: 1, y0: c.persistence_val, y1: c.persistence_val, line: { color: INK, width: 1.5, dash: "dash" } },
-      { type: "line", xref: "x", yref: "paper", x0: n, x1: n, y0: 0, y1: 1, line: { color: INK, width: 1, dash: "dot" } },
-    ],
-    annotations: [
-      { xref: "paper", x: 0, y: c.persistence_val, xanchor: "left", yshift: 9, showarrow: false, text: "“tomorrow = today” on validation", font: { size: 12, color: INK } },
-      ...["MLR", "Random Forest"].map((m) => ({ x: d[d.length - 1], y: c[m].val[d.length - 1], xanchor: "left", xshift: 9, showarrow: false,
-        yshift: (c.MLR.val[d.length - 1] >= c["Random Forest"].val[d.length - 1]) === (m === "MLR") ? 8 : -8,
-        text: m === "MLR" ? "Linear regr." : m, font: { size: 12, color: STYLE[m].color } })),
-    ],
-  }), CONFIG);
-  document.getElementById("lc-out").textContent = `${n} days`;
-  const rfGain = c["Random Forest"].val[2] - c["Random Forest"].val[d.length - 1]; // from 21 days to all 91
-  const verdict = rfGain > 0.3 ? `Going from ${d[2]} to ${d[d.length - 1]} days lowers Random Forest's validation error by ${rfGain.toFixed(2)} points and it is still edging down: with these inputs, more data helps, slowly.`
-    : `Going from ${d[2]} to ${d[d.length - 1]} days changes Random Forest's validation error by only ${Math.abs(rfGain).toFixed(2)} points: more data of the same kind would not fix this. The inputs are the limit, not the amount of data.`;
-  document.getElementById("lc-result").innerHTML =
-    `With ${n} days: linear regression <b>${c.MLR.val[lrn.lcIndex].toFixed(2)}%</b>, Random Forest <b>${c["Random Forest"].val[lrn.lcIndex].toFixed(2)}%</b> on validation ` +
-    `(<q>tomorrow = today</q>: ${c.persistence_val.toFixed(2)}%). ${verdict}`;
-}
-
-function drawLearnForCase() {
-  lrn.penIndex = penChosenIndex();
-  drawPenalty();
-  drawFeatures();
-  drawBiasVariance();
-  drawLearningCurve();
-}
-
-function setupLearn() {
-  setupGD();
-  switchGroup("gd-mode", lrn.gdMode, (v) => { const start = toRaw(gd.path[0]); lrn.gdMode = v; resetGD(start); drawGD(); });
-  const rate = document.getElementById("gd-rate");
-  rate.addEventListener("input", () => { lrn.gdRate = +rate.value; document.getElementById("gd-out").textContent = `${lrn.gdRate}%`; });
-  document.getElementById("gd-step").addEventListener("click", () => stepGD(1));
-  document.getElementById("gd-run").addEventListener("click", () => stepGD(25));
-  document.getElementById("gd-run-many").addEventListener("click", () => stepGD(1000));
-  document.getElementById("gd-reset").addEventListener("click", () => { resetGD(toRaw(gd.path[0])); drawGD(); });
-  drawGD();
-  document.getElementById("gd-chart").on("plotly_click", (ev) => {
-    const pt = ev.points[0];
-    const start = toRaw([pt.x, pt.y]);
-    resetGD(start);
-    drawGD();
-  });
-
-  switchGroup("pen-model", lrn.penModel, (v) => { lrn.penModel = v; lrn.penIndex = penChosenIndex(); drawPenalty(); });
-  const pa = document.getElementById("pen-alpha");
-  pa.addEventListener("input", () => { lrn.penIndex = +pa.value; drawPenalty(); });
-  document.getElementById("pen-chosen").addEventListener("click", () => { lrn.penIndex = penChosenIndex(); drawPenalty(); });
-  const bt = document.getElementById("bv-trees");
-  bt.addEventListener("input", () => { lrn.bvIndex = +bt.value; drawBiasVariance(); });
-  const ld = document.getElementById("lc-days");
-  ld.addEventListener("input", () => { lrn.lcIndex = +ld.value; drawLearningCurve(); });
-  drawLearnForCase();
-}
-
 // ---------- Wiring ----------
 function redrawForControls() {
   controlNote();
@@ -773,14 +528,13 @@ function redrawForControls() {
   drawRanking();
   drawSlopes();
   drawErrorMap();
-  drawImportance();
   if (exps) drawLeakage();
-  if (learnData) drawLearnForCase();
+  if (learnData) drawFeatures();
 }
 
-Promise.all(["results", "days", "data", "random_forest", "experiments", "learning", "regularisation"].map((n) => fetch(`data/${n}.json`).then((r) => r.json())))
-  .then(([res, dy, dt, forest, ex, ln, rg]) => {
-    results = res; days = dy; data = dt; rf = forest; exps = ex; reg = rg;
+Promise.all(["results", "days", "data", "random_forest", "experiments", "learning"].map((n) => fetch(`data/${n}.json`).then((r) => r.json())))
+  .then(([res, dy, dt, forest, ex, ln]) => {
+    results = res; days = dy; data = dt; rf = forest; exps = ex;
     state.day = days.days.findIndex((d) => d.date === "2026-01-26");
     document.getElementById("f1").textContent = `${pct(row("Persistence", "Case 1", "test").nMAE)}%`;
     document.getElementById("f3").textContent = `${signed(row("Random Forest", "Case 3", "test").skill)}%`;
@@ -794,7 +548,7 @@ Promise.all(["results", "days", "data", "random_forest", "experiments", "learnin
     redrawForControls();
     setupExperiments();
     learnData = ln;
-    setupLearn();
+    drawFeatures();
     document.getElementById("calendar").on("plotly_click", (ev) => {
       const i = days.days.findIndex((d) => d.date === String(ev.points[0].x).slice(0, 10));
       if (i >= 0) setDay(i, true);

@@ -28,26 +28,6 @@
   </figure>
 </header>
 
-<div class="controls-bar" id="controls">
-  <div class="control">
-    <span class="control-label" id="case-label">Inputs</span>
-    <div class="switch" id="case-switch" role="radiogroup" aria-labelledby="case-label">
-      <button role="radio" data-v="Case 1"><span class="long">1. Yesterday's power</span><span class="short">Case 1</span></button>
-      <button role="radio" data-v="Case 2"><span class="long">2. + yesterday's weather</span><span class="short">Case 2</span></button>
-      <button role="radio" data-v="Case 3"><span class="long">3. + tomorrow's weather</span><span class="short">Case 3</span></button>
-    </div>
-  </div>
-  <div class="control">
-    <span class="control-label" id="split-label">Scored on</span>
-    <div class="switch" id="split-switch" role="radiogroup" aria-labelledby="split-label">
-      <button role="radio" data-v="train">Train</button>
-      <button role="radio" data-v="val"><span class="long">Validation</span><span class="short">Val</span></button>
-      <button role="radio" data-v="test">Test</button>
-    </div>
-  </div>
-  <p class="control-note" id="control-note"></p>
-</div>
-
 <main>
 
   <section class="findings" aria-labelledby="h-findings">
@@ -59,218 +39,18 @@
     </ol>
   </section>
 
-  <section id="day" aria-labelledby="h-day">
-    <div class="sec-head">
-      <h2 id="h-day">One day, every forecast</h2>
-      <div class="day-nav">
-        <button class="ghost" id="day-prev" aria-label="Previous day">Previous</button>
-        <select id="day-select" aria-label="Choose a day"></select>
-        <button class="ghost" id="day-next" aria-label="Next day">Next</button>
-        <button class="ghost" id="day-best">Easiest day</button>
-        <button class="ghost" id="day-worst">Hardest day</button>
-      </div>
-    </div>
-    <div class="model-chips" id="model-chips" aria-label="Show or hide models"></div>
-    <div id="day-chart" class="chart tall" role="img" aria-label="Actual power and forecasts for the selected day"></div>
-    <div class="day-scores" id="day-scores"></div>
-    <p class="caption">The shaded band is ±7% of capacity, the tolerance used by the Gujarat regulator. Easiest and hardest are judged by
-      the six models' average error for the chosen inputs and split.</p>
-  </section>
+  <nav class="chapters" aria-label="Chapters">
+    <a href="#setup">Setup</a>
+    <a href="#results">Results</a>
+    <a href="#trust">Can we trust it?</a>
+    <a href="#conclusion">Conclusion</a>
+    <a href="#reproduce">Reproduce</a>
+  </nav>
 
-  <section id="results" aria-labelledby="h-results">
-    <div class="sec-head">
-      <h2 id="h-results">How the models rank</h2>
-      <div class="switch small" id="rank-switch" role="radiogroup" aria-label="Rank by">
-        <button role="radio" data-v="skill">Skill</button>
-        <button role="radio" data-v="nRMSE">RMSE</button>
-        <button role="radio" data-v="nMAE">MAE</button>
-        <button role="radio" data-v="r2">R²</button>
-      </div>
-    </div>
-    <p class="lead" id="rank-lead"></p>
-    <div id="rank-chart" class="chart" role="img" aria-label="Model ranking for the selected inputs and split"></div>
-    <details class="more">
-      <summary>All numbers for this view</summary>
-      <div class="table-scroll"><table id="rank-table"></table></div>
-    </details>
-
-    <div class="pair">
-      <figure>
-        <div id="ladder-chart" class="chart mid" role="img" aria-label="Skill of each model in cases 1, 2 and 3"></div>
-        <figcaption><b>Adding information.</b> Each line is one model, from case 1 to case 3. Yesterday's weather barely moves
-          anything; tomorrow's weather lifts every model, the tree models most.</figcaption>
-      </figure>
-      <figure>
-        <div id="overfit-chart" class="chart mid" role="img" aria-label="Skill of each model on train, validation and test"></div>
-        <figcaption><b>Train, validation, test.</b> A steep fall from train to validation is overfitting: the model learned the
-          training days rather than the pattern.</figcaption>
-      </figure>
-    </div>
-  </section>
-
-  <section id="experiments" aria-labelledby="h-exp">
-    <h2 id="h-exp">Three experiments to run yourself</h2>
-    <p class="lead">Each one tests an idea the results above depend on. Change the setting and the model is re-scored.</p>
-
-    <article class="exp">
-      <div class="exp-text">
-        <h3>How good must the weather forecast be?</h3>
-        <p>Case 3 is told tomorrow's sunlight exactly. No real forecast is that good. Make the forecast worse and watch each
-          model's lead over <q>tomorrow = today</q> shrink.</p>
-        <label class="dial" for="fe-level">Sunlight forecast error
-          <input type="range" id="fe-level" min="0" max="8" step="1" value="0">
-          <output id="fe-out" for="fe-level"></output></label>
-        <div class="switch small" id="fe-split" role="radiogroup" aria-label="Days scored">
-          <button role="radio" data-v="val">Validation days</button><button role="radio" data-v="test">Test days</button>
-        </div>
-        <p class="exp-result" id="fe-result"></p>
-        <p class="caption">Each day's sunlight is multiplied by a random factor (the same all day, since forecasts tend to be wrong for
-          a whole day); skill is averaged over 30 random draws. The models are the case 3 models, unchanged.</p>
-      </div>
-      <div id="fe-chart" class="chart mid" role="img" aria-label="Skill against sunlight forecast error"></div>
-    </article>
-
-    <article class="exp">
-      <div class="exp-text">
-        <h3>A line against a tree</h3>
-        <p>Power rises with sunlight, then levels off. Give a regression tree more leaves and it bends to follow the curve;
-          the straight line cannot. Give it too many and it starts chasing noise.</p>
-        <label class="dial" for="tree-leaves">Leaves in the tree
-          <input type="range" id="tree-leaves" min="1" max="60" step="1" value="1">
-          <output id="tree-out" for="tree-leaves"></output></label>
-        <p class="exp-result" id="tree-result"></p>
-        <p class="caption">Fitted live in your browser on 1,000 training blocks and checked on 500 others it has not seen. One input
-          only (sunlight at that block), so the errors are larger than the full models'.</p>
-      </div>
-      <div class="exp-charts">
-        <div id="tree-chart" class="chart mid" role="img" aria-label="Power against sunlight with a line and a tree"></div>
-        <div id="tree-curve" class="chart small" role="img" aria-label="Error against number of leaves"></div>
-      </div>
-    </article>
-
-    <article class="exp">
-      <div class="exp-text">
-        <h3>Break the evaluation</h3>
-        <p>The models are tested on days after the ones they learned from. Shuffle the data instead, so training and testing
-          are mixed in time, and the same models suddenly look much better. They are not: they have seen the answer's neighbours.</p>
-        <div class="switch small" id="leak-scheme" role="radiogroup" aria-label="How the data is divided">
-          <button role="radio" data-v="chronological">By date (ours)</button>
-          <button role="radio" data-v="shuffled days">Shuffled days</button>
-          <button role="radio" data-v="shuffled blocks">Shuffled blocks</button>
-        </div>
-        <p class="exp-result" id="leak-result"></p>
-        <p class="caption">Same models and settings; only the split changes. Uses the inputs chosen in the bar at the top. Shuffled
-          results are averaged over 5 shuffles. Part of the first jump is also that shuffled test days come from the whole
-          winter, not the calm final week; the step from shuffled days to shuffled blocks isolates the leakage. None of these
-          shuffled scores is a result to report.</p>
-      </div>
-      <div id="leak-chart" class="chart mid" role="img" aria-label="Skill under each way of dividing the data"></div>
-    </article>
-  </section>
-
-  <section id="learn" aria-labelledby="h-learn">
-    <h2 id="h-learn">How the models learn</h2>
-    <p class="lead">The same data, taken apart: how a line is fitted, what a penalty does, why averaging trees helps, and
-      whether more data would.</p>
-
-    <article class="exp">
-      <div class="exp-text">
-        <h3>Walking downhill to the best line</h3>
-        <p>Case 1 fits a line: tomorrow = b₀ + b₁ × today. Every pair (b₀, b₁) has an error; the map shows it. Gradient descent
-          starts anywhere and repeatedly steps downhill. Click the map to move the start.</p>
-        <div class="switch small" id="gd-mode" role="radiogroup" aria-label="Input scaling">
-          <button role="radio" data-v="raw">Raw input</button><button role="radio" data-v="std">Standardised input</button>
-        </div>
-        <label class="dial" for="gd-rate">Step size, as a share of the largest safe step
-          <input type="range" id="gd-rate" min="5" max="115" step="5" value="60">
-          <output id="gd-out" for="gd-rate"></output></label>
-        <div class="day-nav">
-          <button class="ghost" id="gd-step">Take a step</button>
-          <button class="ghost" id="gd-run">Take 25 steps</button>
-          <button class="ghost" id="gd-run-many">Take 1,000 steps</button>
-          <button class="ghost" id="gd-reset">Start over</button>
-        </div>
-        <p class="exp-result" id="gd-result"></p>
-        <p class="caption">The surface is exact for all 4,186 training blocks. With the raw input the valley is long and narrow, so
-          progress along it is slow; standardising the input (mean 0, spread 1) turns it into a round bowl. The destination is
-          the least-squares line either way.</p>
-      </div>
-      <div id="gd-chart" class="chart tall" role="img" aria-label="Error surface with the gradient descent path"></div>
-    </article>
-
-    <article class="exp">
-      <div class="exp-text">
-        <h3>What a penalty does to the inputs</h3>
-        <p>Ridge and Lasso fit the same line as linear regression but charge for large coefficients. Raise the charge: Ridge
-          shrinks every input a little; Lasso removes inputs one at a time.</p>
-        <div class="switch small" id="pen-model" role="radiogroup" aria-label="Penalised model">
-          <button role="radio" data-v="Ridge">Ridge</button><button role="radio" data-v="Lasso">Lasso</button><button role="radio" data-v="Elastic Net">Elastic Net</button>
-        </div>
-        <label class="dial" for="pen-alpha">Penalty strength α
-          <input type="range" id="pen-alpha" min="0" max="20" step="1" value="0">
-          <output id="pen-out" for="pen-alpha"></output></label>
-        <div class="day-nav"><button class="ghost" id="pen-chosen">Use the α chosen on validation</button></div>
-        <p class="exp-result" id="pen-result"></p>
-        <p class="caption">Inputs are standardised, so each bar is the change in forecast for a typical (one standard deviation)
-          change in that input. Uses the inputs chosen in the bar at the top; case 1 has a single input.</p>
-      </div>
-      <div id="pen-chart" class="chart mid" role="img" aria-label="Coefficients at the chosen penalty"></div>
-    </article>
-
-    <article class="exp wide">
-      <div class="exp-text">
-        <h3>Which inputs each model keeps</h3>
-        <p>At the settings chosen on validation. Linear models show their coefficient; a dropped input has a coefficient of
-          exactly zero. Tree models never drop an input, so they show how much the error rises when it is shuffled.</p>
-      </div>
-      <div class="table-scroll"><table id="feat-table" class="feat"></table></div>
-    </article>
-
-    <article class="exp">
-      <div class="exp-text">
-        <h3>Why averaging trees helps</h3>
-        <p>Train the same model on 50 reshuffled sets of training days. A model can be wrong in two ways: on average
-          (bias), or by changing its mind from one training set to the next (variance).</p>
-        <label class="dial" for="bv-trees">Trees averaged in the forest
-          <input type="range" id="bv-trees" min="0" max="7" step="1" value="0">
-          <output id="bv-out" for="bv-trees"></output></label>
-        <p class="exp-result" id="bv-result"></p>
-        <p class="caption">Measured on validation blocks; bias² plus variance is the expected squared error, in (% of capacity)².
-          Bias² also contains the noise no model could predict. Uses the inputs chosen in the bar at the top.</p>
-      </div>
-      <div id="bv-chart" class="chart mid" role="img" aria-label="Bias and variance of linear regression and forests"></div>
-    </article>
-
-    <article class="exp">
-      <div class="exp-text">
-        <h3>Would more data help?</h3>
-        <p>Give the models only the most recent days of training and watch the validation error. If it keeps falling, more
-          data would help. If it is flat, the limit is somewhere else.</p>
-        <label class="dial" for="lc-days">Training days used
-          <input type="range" id="lc-days" min="0" max="7" step="1" value="7">
-          <output id="lc-out" for="lc-days"></output></label>
-        <p class="exp-result" id="lc-result"></p>
-        <p class="caption">Uses the inputs chosen in the bar at the top. Dotted lines are the error on the days the model trained on.</p>
-      </div>
-      <div id="lc-chart" class="chart mid" role="img" aria-label="Error against number of training days"></div>
-    </article>
-  </section>
-
-  <section id="errors" aria-labelledby="h-errors">
-    <h2 id="h-errors">Where the forecasts go wrong</h2>
-    <div id="error-map" class="chart" role="img" aria-label="Daily error of every model on every day of the selected split"></div>
-    <p class="caption">Each cell is one model on one day; darker means a bigger error. Columns that are dark for everyone are weather
-      changes no model saw coming. Click a cell to open that day above.</p>
-    <figure class="solo">
-      <div id="importance-chart" class="chart mid" role="img" aria-label="Random Forest input importance"></div>
-      <figcaption><b>What the forest relies on.</b> Rise in validation error when one input is shuffled. With tomorrow's
-        weather, sunlight is almost everything; wind never matters.</figcaption>
-    </figure>
-  </section>
-
-  <section id="method" aria-labelledby="h-method" class="method">
-    <h2 id="h-method">How it was done</h2>
-
+  <section id="setup" class="chapter" aria-labelledby="h-setup">
+    <h2 id="h-setup">Setup</h2>
+    <p class="lead">What is being forecast, from what data, with which models, and how they are scored. Everything below uses
+      these words.</p>
     <div class="method-grid">
       <div>
         <h3>Question</h3>
@@ -305,6 +85,15 @@
           Both repaired days fall in training. Scalers for the penalised models are fitted on training data only.</p>
       </div>
       <div>
+        <h3>Evaluation</h3>
+        <div id="split-strip" class="chart strip" role="img" aria-label="Train, validation and test periods"></div>
+        <p>Split by date, never shuffled, so models only learn from the past: train 92 days, validation 24, test 7. Every
+          setting is chosen on validation; test is scored once. Only 07:00 to 18:15 counts, since nights are trivially zero.
+          Errors are divided by capacity, not by actual power, which is near zero at dawn.</p>
+        <p><b>Skill</b> = 1 − RMSE of the model ÷ RMSE of persistence. Zero means no better than <q>tomorrow = today</q>. Each skill
+          has a 90% interval from resampling the days 1,000 times.</p>
+      </div>
+      <div class="span">
         <h3>Baselines and methods</h3>
         <table class="plain">
           <tr><td>Persistence</td><td>tomorrow = today, block by block; the reference for skill</td></tr>
@@ -325,21 +114,170 @@
           </table>
         </details>
       </div>
-      <div>
-        <h3>Evaluation</h3>
-        <div id="split-strip" class="chart strip" role="img" aria-label="Train, validation and test periods"></div>
-        <p>Split by date, never shuffled, so models only learn from the past: train 92 days, validation 24, test 7. Every
-          setting is chosen on validation; test is scored once. Only 07:00 to 18:15 counts, since nights are trivially zero.
-          Errors are divided by capacity, not by actual power, which is near zero at dawn.</p>
-        <p><b>Skill</b> = 1 − RMSE of the model ÷ RMSE of persistence. Zero means no better than <q>tomorrow = today</q>. Each skill
-          has a 90% interval from resampling the days 1,000 times.</p>
+    </div>
+  </section>
+
+  <section id="results" class="chapter" aria-labelledby="h-results">
+    <h2 id="h-results">Results</h2>
+    <p class="lead">Pick the inputs and the days in the bar below; it stays at the top of the screen and every result in this
+      chapter and the next follows it.</p>
+  </section>
+
+  <div class="controls-bar" id="controls">
+  <div class="control">
+    <span class="control-label" id="case-label">Inputs</span>
+    <div class="switch" id="case-switch" role="radiogroup" aria-labelledby="case-label">
+      <button role="radio" data-v="Case 1"><span class="long">1. Yesterday's power</span><span class="short">Case 1</span></button>
+      <button role="radio" data-v="Case 2"><span class="long">2. + yesterday's weather</span><span class="short">Case 2</span></button>
+      <button role="radio" data-v="Case 3"><span class="long">3. + tomorrow's weather</span><span class="short">Case 3</span></button>
+    </div>
+  </div>
+  <div class="control">
+    <span class="control-label" id="split-label">Scored on</span>
+    <div class="switch" id="split-switch" role="radiogroup" aria-labelledby="split-label">
+      <button role="radio" data-v="train">Train</button>
+      <button role="radio" data-v="val"><span class="long">Validation</span><span class="short">Val</span></button>
+      <button role="radio" data-v="test">Test</button>
+    </div>
+  </div>
+  <p class="control-note" id="control-note"></p>
+</div>
+
+  <section class="chapter-body" aria-label="Results">
+    <div class="block" id="ranking">
+    <div class="sec-head">
+      <h3 class="block-title" id="h-rank">How the models rank</h3>
+      <div class="switch small" id="rank-switch" role="radiogroup" aria-label="Rank by">
+        <button role="radio" data-v="skill">Skill</button>
+        <button role="radio" data-v="nRMSE">RMSE</button>
+        <button role="radio" data-v="nMAE">MAE</button>
+        <button role="radio" data-v="r2">R²</button>
       </div>
-      <div>
-        <h3>Limitations</h3>
+    </div>
+    <p class="uses">Uses: the inputs and days chosen in the bar above.</p>
+    <p class="lead" id="rank-lead"></p>
+    <div id="rank-chart" class="chart" role="img" aria-label="Model ranking for the selected inputs and split"></div>
+    <details class="more">
+      <summary>All numbers for this view</summary>
+      <div class="table-scroll"><table id="rank-table"></table></div>
+    </details>
+
+    <div class="pair">
+      <figure>
+        <div id="ladder-chart" class="chart mid" role="img" aria-label="Skill of each model in cases 1, 2 and 3"></div>
+        <figcaption>Uses: the days chosen above, all three cases. <b>Adding information.</b> Each line is one model, from case 1 to case 3. Yesterday's weather barely moves
+          anything; tomorrow's weather lifts every model, the tree models most.</figcaption>
+      </figure>
+      <figure>
+        <div id="overfit-chart" class="chart mid" role="img" aria-label="Skill of each model on train, validation and test"></div>
+        <figcaption>Uses: the inputs chosen above, all three splits. <b>Train, validation, test.</b> A steep fall from train to validation is overfitting: the model learned the
+          training days rather than the pattern.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+    <article class="exp wide">
+      <div class="exp-text">
+        <h3>Which inputs each model keeps</h3>
+        <p>At the settings chosen on validation, for the inputs chosen in the bar above. Linear models show their coefficient; a dropped input has a coefficient of
+          exactly zero. Tree models never drop an input, so they show how much the error rises when it is shuffled.</p>
+      </div>
+      <div class="table-scroll"><table id="feat-table" class="feat"></table></div>
+    </article>
+
+    <article class="exp">
+      <div class="exp-text">
+        <h3>Why trees beat lines here</h3>
+        <p>Power rises with sunlight, then levels off. Give a regression tree more leaves and it bends to follow the curve;
+          the straight line cannot. Give it too many and it starts chasing noise.</p>
+        <label class="dial" for="tree-leaves">Leaves in the tree
+          <input type="range" id="tree-leaves" min="1" max="60" step="1" value="1">
+          <output id="tree-out" for="tree-leaves"></output></label>
+        <p class="exp-result" id="tree-result"></p>
+        <p class="caption">Not affected by the bar above. Fitted live in your browser on 1,000 training blocks and checked on 500 others it has not seen. One input
+          only (sunlight at that block), so the errors are larger than the full models'.</p>
+      </div>
+      <div class="exp-charts">
+        <div id="tree-chart" class="chart mid" role="img" aria-label="Power against sunlight with a line and a tree"></div>
+        <div id="tree-curve" class="chart small" role="img" aria-label="Error against number of leaves"></div>
+      </div>
+    </article>
+
+    <div class="block" id="day">
+    <div class="sec-head">
+      <h3 class="block-title" id="h-day">One day, every forecast</h3>
+      <div class="day-nav">
+        <button class="ghost" id="day-prev" aria-label="Previous day">Previous</button>
+        <select id="day-select" aria-label="Choose a day"></select>
+        <button class="ghost" id="day-next" aria-label="Next day">Next</button>
+        <button class="ghost" id="day-best">Easiest day</button>
+        <button class="ghost" id="day-worst">Hardest day</button>
+      </div>
+    </div>
+    <p class="uses">Uses: the inputs chosen above. Easiest and hardest are picked from the days chosen above.</p>
+    <div class="model-chips" id="model-chips" aria-label="Show or hide models"></div>
+    <div id="day-chart" class="chart tall" role="img" aria-label="Actual power and forecasts for the selected day"></div>
+    <div class="day-scores" id="day-scores"></div>
+    <p class="caption">The shaded band is ±7% of capacity, the tolerance used by the Gujarat regulator. Easiest and hardest are judged by
+      the six models' average error.</p>
+  </div>
+
+    <div class="block" id="errors">
+      <h3 class="block-title">Where the forecasts go wrong</h3>
+      <p class="uses">Uses: the inputs and days chosen above.</p>
+      <div id="error-map" class="chart" role="img" aria-label="Daily error of every model on every day of the selected split"></div>
+    <p class="caption">Each cell is one model on one day; darker means a bigger error. Columns that are dark for everyone are weather
+      changes no model saw coming. Click a cell to open that day above.</p>
+    </div>
+  </section>
+
+  <section id="trust" class="chapter" aria-labelledby="h-trust">
+    <h2 id="h-trust">Can we trust it?</h2>
+    <p class="lead">Two checks on the results above: how much the best result depends on a perfect weather forecast, and what
+      happens if the evaluation is done the wrong way. Then the limits of the claim.</p>
+
+    <article class="exp">
+      <div class="exp-text">
+        <h3>How good must the weather forecast be?</h3>
+        <p>Case 3 is told tomorrow's sunlight exactly. No real forecast is that good. Make the forecast worse and watch each
+          model's lead over <q>tomorrow = today</q> shrink.</p>
+        <label class="dial" for="fe-level">Sunlight forecast error
+          <input type="range" id="fe-level" min="0" max="8" step="1" value="0">
+          <output id="fe-out" for="fe-level"></output></label>
+        <div class="switch small" id="fe-split" role="radiogroup" aria-label="Days scored">
+          <button role="radio" data-v="val">Validation days</button><button role="radio" data-v="test">Test days</button>
+        </div>
+        <p class="exp-result" id="fe-result"></p>
+        <p class="caption">Always the case 3 models, on the days chosen with the switch above. Each day's sunlight is multiplied by a random factor (the same all day, since forecasts tend to be wrong for
+          a whole day); skill is averaged over 30 random draws. The models are the case 3 models, unchanged.</p>
+      </div>
+      <div id="fe-chart" class="chart mid" role="img" aria-label="Skill against sunlight forecast error"></div>
+    </article>
+
+    <article class="exp">
+      <div class="exp-text">
+        <h3>Break the evaluation</h3>
+        <p>The models are tested on days after the ones they learned from. Shuffle the data instead, so training and testing
+          are mixed in time, and the same models suddenly look much better. They are not: they have seen the answer's neighbours.</p>
+        <div class="switch small" id="leak-scheme" role="radiogroup" aria-label="How the data is divided">
+          <button role="radio" data-v="chronological">By date (ours)</button>
+          <button role="radio" data-v="shuffled days">Shuffled days</button>
+          <button role="radio" data-v="shuffled blocks">Shuffled blocks</button>
+        </div>
+        <p class="exp-result" id="leak-result"></p>
+        <p class="caption">Same models and settings; only the split changes. Uses the inputs chosen in the bar above, scored on the test week. Shuffled
+          results are averaged over 5 shuffles. Part of the first jump is also that shuffled test days come from the whole
+          winter, not the calm final week; the step from shuffled days to shuffled blocks isolates the leakage. None of these
+          shuffled scores is a result to report.</p>
+      </div>
+      <div id="leak-chart" class="chart mid" role="img" aria-label="Skill under each way of dividing the data"></div>
+    </article>
+
+    <div class="block">
+        <h3 class="block-title">Limitations</h3>
         <p>One plant, one winter. The test set is seven calm, clear days, so its intervals are wide. Case 3 uses measured weather;
           a real system would use weather forecasts with their own errors. Real schedules are submitted before day D ends.
           Wind direction is on an unknown scale. These are forecasts, not causes.</p>
-      </div>
     </div>
   </section>
 
