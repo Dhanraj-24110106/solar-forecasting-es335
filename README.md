@@ -109,11 +109,6 @@ AI assistance (Claude, by Anthropic, through Claude Code) was used mainly to bui
 (the HTML, CSS and JavaScript in `docs/`, including the interactive charts), and for help with writing and
 debugging code and with editing text.
 
-The project question, the choice of the three input cases, the models, the train/validation/test split, the
-scoring window and metrics, the data-cleaning decisions and the interpretation of the results were decided by me;
-each decision and its reason is logged in `DECISIONS.md`. I checked the results by re-running the notebooks and
-recomputing key numbers independently, and every number on the website is exported from those notebooks.
-
 ## References
 
 - F. Pedregosa et al., "Scikit-learn: Machine Learning in Python," *JMLR* 12, 2011.
