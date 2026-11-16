@@ -521,6 +521,23 @@ function drawFeatures() {
   document.getElementById("feat-table").innerHTML = head + body + foot;
 }
 
+// ---------- All results at a glance ----------
+function drawAllResults() {
+  const cases = ["Case 1", "Case 2", "Case 3"], splits = ["val", "test"];
+  const cell = (r) => {
+    if (!r) return "<td></td>";
+    const txt = `${signed(r.skill)} <span class="ci">[${signed(r.skill_lo)}, ${signed(r.skill_hi)}]</span>`;
+    return `<td class="${r.skill_lo > 0 ? "clear" : r.skill < 0 ? "neg" : ""}">${r.skill_lo > 0 ? `<b>${txt}</b>` : txt}</td>`;
+  };
+  const head = `<tr><th rowspan="2">Model</th>${cases.map((c) => `<th colspan="2" class="grp">${c}</th>`).join("")}</tr>
+    <tr>${cases.map(() => "<th>Validation</th><th>Test</th>").join("")}</tr>`;
+  const body = [...LEARNING, "7-day average"].map((m) => `<tr><td>${m}${m === "7-day average" ? " (baseline)" : ""}</td>` +
+    cases.map((c) => splits.map((s) => cell(row(m, c, s))).join("")).join("") + "</tr>").join("");
+  const p = (s) => row("Persistence", "Case 1", s).nRMSE.toFixed(2);
+  const foot = `<tr class="ref"><td>Persistence RMSE, % of capacity</td>${cases.map(() => `<td>${p("val")}</td><td>${p("test")}</td>`).join("")}</tr>`;
+  document.getElementById("all-table").innerHTML = head + body + foot;
+}
+
 // ---------- Wiring ----------
 function redrawForControls() {
   controlNote();
@@ -545,6 +562,7 @@ Promise.all(["results", "days", "data", "random_forest", "experiments", "learnin
     drawChips();
     setupDayNav();
     drawSplitStrip();
+    drawAllResults();
     redrawForControls();
     setupExperiments();
     learnData = ln;

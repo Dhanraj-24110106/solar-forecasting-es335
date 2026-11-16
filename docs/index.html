@@ -89,8 +89,9 @@
     <div class="method-grid">
       <div>
         <h3>Question</h3>
-        <p>On day D, forecast the power of each 15-minute block of day D+1. One row is one block; the target is its power.
-          The forecast is made after day D ends. The claim covers one plant in one winter.</p>
+        <p>On day D, forecast the power of each 15-minute block of day D+1. <b>One row is one daytime block of day D+1</b>; its
+          inputs are values at the same block, and the target is its power. The forecast is made after day D ends. The claim
+          covers one plant in one winter.</p>
         <ul class="cases">
           <li><b>Case 1</b> power at the same block yesterday</li>
           <li><b>Case 2</b> plus yesterday's sunlight, temperatures and wind</li>
@@ -99,55 +100,64 @@
       </div>
       <div>
         <h3>Data</h3>
-        <p>Plant SCADA and on-site weather station, 15 Oct 2025 to 14 Feb 2026: 11,808 rows, no gaps. Supplied by the course
-          instructor and not redistributed; this page shows power only as a share of capacity.</p>
-        <details class="more"><summary>Variables</summary>
-          <table class="plain">
-            <tr><th>Variable</th><th>Unit</th><th>Range</th></tr>
-            <tr><td>Active power (target)</td><td>MW</td><td>0 to 20.8</td></tr>
-            <tr><td>Sunlight, GHI</td><td>W/m²</td><td>0 to 937</td></tr>
-            <tr><td>Module temperature</td><td>°C</td><td>5 to 54</td></tr>
-            <tr><td>Air temperature</td><td>°C</td><td>9 to 36</td></tr>
-            <tr><td>Wind speed</td><td>m/s</td><td>0.2 to 3.6</td></tr>
-            <tr><td>Wind direction</td><td>unknown 0–40 scale</td><td>1.5 to 39.5</td></tr>
-          </table>
-        </details>
+        <p>Plant SCADA and on-site weather station of a 21.5 MW (AC) plant in Surendranagar, Gujarat, supplied by the course
+          instructor: 15 Oct 2025 to 14 Feb 2026, 123 days × 96 blocks = 11,808 rows. The data is not redistributed; this page
+          shows power only as a share of capacity.</p>
+        <table class="plain">
+          <tr><th>Variable</th><th>Unit</th><th>Range</th></tr>
+          <tr><td>Active power (target)</td><td>MW</td><td>0 to 20.8</td></tr>
+          <tr><td>Sunlight, GHI</td><td>W/m²</td><td>0 to 937</td></tr>
+          <tr><td>Module temperature</td><td>°C</td><td>5 to 54</td></tr>
+          <tr><td>Air temperature</td><td>°C</td><td>9 to 36</td></tr>
+          <tr><td>Wind speed</td><td>m/s</td><td>0.2 to 3.6</td></tr>
+          <tr><td>Wind direction</td><td>unknown 0–40 scale</td><td>1.5 to 39.5</td></tr>
+        </table>
+        <p class="details-link">Quality checks: no missing or duplicated timestamps and no empty cells. Three problems were found,
+          fixed as described under Preprocessing.</p>
       </div>
-      <div>
-        <h3>Preprocessing</h3>
-        <p>27 Nov had a block of data copied from another day: replaced by the average of 26 and 28 Nov. On 14 Jan the meter
-          stuck at 12.80 MW: re-estimated from sunlight and module temperature. Night-time sunlight read 1.12 W/m²: set to 0.
-          Both repaired days fall in training. Scalers for the penalised models are fitted on training data only.</p>
+      <div class="span">
+        <h3>Preprocessing, and why</h3>
+        <table class="plain">
+          <tr><th>Step</th><th>Why</th></tr>
+          <tr><td>27 Nov, 07:45–16:30: replaced by the average of 26 and 28 Nov</td><td>The raw export had copied these blocks from 26 Nov, identical in every column</td></tr>
+          <tr><td>14 Jan, 13:45–16:30: power re-estimated from sunlight and module temperature (regression on the 7 days before)</td><td>The meter stuck at 12.80 MW while sunlight fell by half</td></tr>
+          <tr><td>Night-time sunlight of 1.12 W/m² set to 0</td><td>One step of sensor offset when no power is produced</td></tr>
+          <tr><td>Nothing else repaired; 10–11 Feb kept as recorded</td><td>Only physically impossible readings are fixed, and both repairs fall in training, so validation and test are untouched</td></tr>
+          <tr><td>Inputs taken from the same block on day D (and D+1 weather in case 3)</td><td>Only information available when the forecast is made, except the labelled case 3 upper bound</td></tr>
+          <tr><td>Inputs standardised for Ridge, Lasso and Elastic Net, with the scaler fitted on training data only</td><td>The penalty needs comparable scales; fitting on training only avoids leaking validation or test data</td></tr>
+          <tr><td>Forecasts clipped to 0–21.5 MW; nights set to 0</td><td>The plant cannot produce outside that range or after dark</td></tr>
+        </table>
+        <p class="details-link">Details: <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/build_clean_winter.py">src/build_clean_winter.py</a> (cleaning) and the
+          input-building cell in each model notebook.</p>
       </div>
-      <div>
+      <div class="span">
         <h3>Evaluation</h3>
         <div id="split-strip" class="chart strip" role="img" aria-label="Train, validation and test periods"></div>
-        <p>Split by date, never shuffled, so models only learn from the past: train 92 days, validation 24, test 7. Every
-          setting is chosen on validation; test is scored once. Only 07:00 to 18:15 counts, since nights are trivially zero.
-          Errors are divided by capacity, not by actual power, which is near zero at dawn.</p>
-        <p><b>Skill</b> = 1 − RMSE of the model ÷ RMSE of persistence. Zero means no better than <q>tomorrow = today</q>. Each skill
-          has a 90% interval from resampling the days 1,000 times.</p>
+        <p>Split by date, never shuffled, so models only learn from the past: train 15 Oct to 14 Jan (92 days, 91 scored),
+          validation 15 Jan to 7 Feb (24), test 8 to 14 Feb (7). Every setting is chosen on validation; test is scored once.
+          Only 07:00 to 18:15 counts, since nights are trivially zero. Errors are divided by capacity, not by actual power,
+          which is near zero at dawn.</p>
+        <p><b>Metrics:</b> MAE and RMSE as % of capacity, R², the share of blocks within ±7% of capacity (the regulator's
+          tolerance), and <b>skill</b> = 1 − RMSE of the model ÷ RMSE of persistence on the same blocks. Zero means no better than
+          <q>tomorrow = today</q>. Each skill has a 90% interval from resampling the days 1,000 times.</p>
+        <p class="details-link">Details: <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/results/splits.csv">results/splits.csv</a> (every date and its split) and
+          <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/summary.ipynb">src/summary.ipynb</a> (one scoring function for every model).</p>
       </div>
       <div class="span">
         <h3>Baselines and methods</h3>
         <table class="plain">
-          <tr><td>Persistence</td><td>tomorrow = today, block by block; the reference for skill</td></tr>
-          <tr><td>7-day average</td><td>mean of the same block over the last week</td></tr>
-          <tr><td>Linear regression</td><td>least squares; power is roughly linear in sunlight</td></tr>
-          <tr><td>Ridge, Lasso, Elastic Net</td><td>penalised lines for correlated inputs; Lasso can drop inputs</td></tr>
-          <tr><td>Random Forest</td><td>300 averaged trees; can follow the plateau, averaging cuts variance</td></tr>
-          <tr><td>AdaBoost</td><td>small trees added one by one, each fixing earlier mistakes</td></tr>
+          <tr><th>Model</th><th>Idea</th><th>Settings chosen on validation (case 1 / 2 / 3)</th><th>Notebook</th></tr>
+          <tr><td>Persistence</td><td>tomorrow = today, block by block; the reference for skill</td><td>none</td><td><a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/persistence_baseline.ipynb">persistence_baseline</a></td></tr>
+          <tr><td>7-day average</td><td>mean of the same block over the last week</td><td>none</td><td><a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/seven_day_average_baseline.ipynb">seven_day_average_baseline</a></td></tr>
+          <tr><td>Linear regression</td><td>least squares; power is roughly linear in sunlight</td><td>none</td><td><a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/mlr.ipynb">mlr</a></td></tr>
+          <tr><td>Ridge</td><td>L2 penalty for correlated inputs</td><td>α = 100 / 178 / 0.01</td><td><a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/ridge.ipynb">ridge</a></td></tr>
+          <tr><td>Lasso</td><td>L1 penalty; can drop inputs</td><td>α = 0.18 / 0.01 / 0.0001</td><td><a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/lasso.ipynb">lasso</a></td></tr>
+          <tr><td>Elastic Net</td><td>both penalties</td><td>α, L1 share = 0.03, 0.3 / 0.1, 0.7 / 0.0001, 0.1</td><td><a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/elastic_net.ipynb">elastic_net</a></td></tr>
+          <tr><td>Random Forest</td><td>300 averaged trees; follows the plateau, averaging cuts variance</td><td>depth, leaf, inputs per split = 5, 50, all / 12, 1, 33% / 12, 1, 67%</td><td><a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/random_forest.ipynb">random_forest</a></td></tr>
+          <tr><td>AdaBoost</td><td>small trees added one by one, each fixing earlier mistakes</td><td>depth, rate, loss, rounds = 4, 0.01, square, 17 / 5, 0.1, square, 56 / 5, 1.0, linear, 17</td><td><a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/adaboost.ipynb">adaboost</a></td></tr>
         </table>
-        <details class="more"><summary>Settings chosen on validation</summary>
-          <table class="plain">
-            <tr><th>Model</th><th>Case 1</th><th>Case 2</th><th>Case 3</th></tr>
-            <tr><td>Ridge, α</td><td>100</td><td>178</td><td>0.01</td></tr>
-            <tr><td>Lasso, α</td><td>0.18</td><td>0.01</td><td>0.0001</td></tr>
-            <tr><td>Elastic Net, α and L1 share</td><td>0.03, 0.3</td><td>0.1, 0.7</td><td>0.0001, 0.1</td></tr>
-            <tr><td>Random Forest, depth, leaf, inputs per split</td><td>5, 50, all</td><td>12, 1, 33%</td><td>12, 1, 67%</td></tr>
-            <tr><td>AdaBoost, depth, rate, loss, rounds</td><td>4, 0.01, square, 17</td><td>5, 0.1, square, 56</td><td>5, 1.0, linear, 17</td></tr>
-          </table>
-        </details>
+        <p class="details-link">Each notebook shows the full search over settings; the search tables are in
+          <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/tree/main/results/metrics">results/metrics</a>.</p>
       </div>
     </div>
   </section>
@@ -211,6 +221,17 @@
     </div>
   </div>
 
+    <div class="block" id="all-results">
+      <h3 class="block-title">All results at a glance</h3>
+      <p class="uses">Not affected by the bar above: every model, every case, validation and test.</p>
+      <p>Skill against <q>tomorrow = today</q> (persistence), in %, with its 90% interval. Bold: the whole interval is above zero,
+        so the model is clearly better than persistence. Persistence's own RMSE is in the last row for scale.</p>
+      <div class="table-scroll"><table id="all-table" class="all"></table></div>
+      <p class="details-link">Details: every metric for every model, case and split in
+        <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/results/metrics/summary_table.csv">results/metrics/summary_table.csv</a>, produced by
+        <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/summary.ipynb">src/summary.ipynb</a>.</p>
+    </div>
+
     <article class="exp wide">
       <div class="exp-text">
         <h3>Which inputs each model keeps</h3>
@@ -263,6 +284,8 @@
       <div id="error-map" class="chart" role="img" aria-label="Daily error of every model on every day of the selected split"></div>
     <p class="caption">Each cell is one model on one day; darker means a bigger error. Columns that are dark for everyone are weather
       changes no model saw coming. Click a cell to open that day above.</p>
+      <p class="details-link">Details: per-day scores for every model are exported to
+        <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/docs/data/days.json">docs/data/days.json</a>; the worst days are listed in each model notebook.</p>
     </div>
   </section>
 
@@ -304,6 +327,8 @@
           results are averaged over 5 shuffles. Part of the first jump is also that shuffled test days come from the whole
           winter, not the calm final week; the step from shuffled days to shuffled blocks isolates the leakage. None of these
           shuffled scores is a result to report.</p>
+        <p class="details-link">Details: both checks are computed in <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/summary.ipynb">src/summary.ipynb</a>
+          (section 6b), which also checks that the unaltered settings reproduce the main results.</p>
       </div>
       <div id="leak-chart" class="chart mid" role="img" aria-label="Skill under each way of dividing the data"></div>
     </article>
