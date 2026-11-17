@@ -53,13 +53,33 @@ const axis = (extra = {}) => ({ gridcolor: RULE, zerolinecolor: INK, linecolor: 
 // ---------- Switches ----------
 function switchGroup(id, current, onPick) {
   const el = document.getElementById(id);
-  const sync = (v) => el.querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.v === v)));
+  const buttons = () => [...el.querySelectorAll("button")];
+  // One tab stop per group; the checked option is the one Tab lands on.
+  const sync = (v) => buttons().forEach((b) => {
+    const on = b.dataset.v === v;
+    b.setAttribute("aria-checked", String(on));
+    b.tabIndex = on ? 0 : -1;
+  });
   sync(current);
   el.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
     sync(b.dataset.v);
     onPick(b.dataset.v);
+  });
+  // Arrow keys move between options and select them (standard radio-group behaviour).
+  el.addEventListener("keydown", (e) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    const list = buttons();
+    let i = list.indexOf(document.activeElement);
+    if (i < 0) return;
+    if (step) i = (i + step + list.length) % list.length;
+    else if (e.key === "Home") i = 0;
+    else if (e.key === "End") i = list.length - 1;
+    else return;
+    e.preventDefault();
+    list[i].focus();
+    list[i].click();
   });
   return sync;
 }
@@ -350,6 +370,7 @@ function drawForecastError() {
   }), CONFIG);
 
   document.getElementById("fe-out").textContent = sigma === 0 ? "0% (perfect)" : `±${sigma}%`;
+  document.getElementById("fe-level").setAttribute("aria-valuetext", sigma === 0 ? "0%, perfect forecast" : `plus or minus ${sigma}%`);
   const still = LEARNING.filter((m) => fe.skill[m][exp.feSplit][exp.feLevel] > 0);
   const be = (m) => { const b = breakEven(L, fe.skill[m][exp.feSplit]); return b == null ? "more than 50%" : `about ${Math.round(b)}%`; };
   document.getElementById("fe-result").innerHTML =
@@ -441,6 +462,7 @@ function drawTree() {
     ],
   }), CONFIG);
   document.getElementById("tree-out").textContent = k;
+  document.getElementById("tree-leaves").setAttribute("aria-valuetext", `${k} ${k === 1 ? "leaf" : "leaves"}`);
   const held = tree.heldErr[k - 1], gap = held - tree.fitErr[k - 1];
   const verdict = k === 1 ? "With one leaf the tree predicts the same value everywhere: far worse than the line."
     : held > tree.lineHeld ? "Too few leaves to follow the curve: the tree still loses to the line."
@@ -451,7 +473,7 @@ function drawTree() {
     (gap >= 0.05 ? ` It does ${gap.toFixed(2)} points better on the blocks it learned from than on unseen ones.` : "");
 }
 
-// ---- 3. Break the evaluation ----
+// ---- 3. What if we had split randomly? ----
 function drawLeakage() {
   const rowsOf = (scheme) => LEARNING.map((m) => exps.leakage.find((r) => r.model === m && r.case === state.case && r.scheme === scheme));
   const honest = rowsOf("chronological"), now = rowsOf(exp.scheme);
