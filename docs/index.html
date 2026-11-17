@@ -254,6 +254,7 @@
         <label class="dial" for="tree-leaves">Leaves in the tree
           <input type="range" id="tree-leaves" min="1" max="60" step="1" value="1">
           <output id="tree-out" for="tree-leaves"></output></label>
+        <button class="ghost preset" id="tree-best" type="button">Best number of leaves</button>
         <p class="exp-result" id="tree-result"></p>
         <p class="caption">Not affected by the bar above. Fitted live in your browser on 1,000 training blocks and checked on 500 others it has not seen. One input
           only (sunlight at that block), so the errors are larger than the full models'.</p>
@@ -307,6 +308,7 @@
         <label class="dial" for="fe-level">Sunlight forecast error
           <input type="range" id="fe-level" min="0" max="8" step="1" value="0">
           <output id="fe-out" for="fe-level"></output></label>
+        <button class="ghost preset" id="fe-breakeven" type="button">Break-even for Random Forest</button>
         <div class="switch small" id="fe-split" role="radiogroup" aria-label="Days scored">
           <button role="radio" data-v="val">Validation days</button><button role="radio" data-v="test">Test days</button>
         </div>

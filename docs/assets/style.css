@@ -280,3 +280,5 @@ table.all th.grp { text-align: center; border-bottom: 2px solid var(--ink); colo
 table.all td.clear { color: var(--good); }
 table.all tr.ref td { color: var(--ink-soft); background: var(--salt-deep); }
 .ci { color: var(--ink-soft); font-size: 12px; font-weight: 400; }
+
+button.ghost.preset { display: inline-block; margin: 4px 0 10px; }

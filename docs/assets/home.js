@@ -518,6 +518,17 @@ function setupExperiments() {
   switchGroup("fe-split", exp.feSplit, (v) => { exp.feSplit = v; drawForecastError(); });
   const tl = document.getElementById("tree-leaves");
   tl.addEventListener("input", () => { exp.leaves = +tl.value; drawTree(); });
+  // Jump to the number of leaves with the lowest error on the held-out blocks.
+  document.getElementById("tree-best").addEventListener("click", () => {
+    exp.leaves = tl.value = tree.bestK; drawTree();
+  });
+  // Jump to the largest forecast error at which Random Forest still beats persistence.
+  document.getElementById("fe-breakeven").addEventListener("click", () => {
+    const s = exps.forecast_error.skill["Random Forest"][exp.feSplit];
+    let i = 0;
+    while (i + 1 < s.length && s[i + 1] > 0) i++;
+    exp.feLevel = fe.value = i; drawForecastError();
+  });
   switchGroup("leak-scheme", exp.scheme, (v) => { exp.scheme = v; drawLeakage(); });
   drawForecastError();
   drawTree();
