@@ -144,7 +144,10 @@
           which is near zero at dawn.</p>
         <p><b>Metrics:</b> MAE and RMSE as % of capacity, R², the share of blocks within ±7% of capacity (the regulator's
           tolerance), and <b>skill</b> = 1 − RMSE of the model ÷ RMSE of persistence on the same blocks. Zero means no better than
-          <q>tomorrow = today</q>. Each skill has a 90% interval from resampling the days 1,000 times.</p>
+          <q>tomorrow = today</q>. Each skill has a 90% interval from resampling the days 1,000 times.
+          RMSE is the main measure, used for skill and for choosing every setting: squaring makes large misses count most,
+          and large misses are what the grid and the ±7% band penalise. MAE is shown alongside; R² is reported but not used
+          to compare, since its reference (always predict the average) is beaten by every forecast.</p>
         <p class="details-link">Details: <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/results/splits.csv">results/splits.csv</a> (every date and its split) and
           <a href="https://github.com/Dhanraj-24110106/solar-forecasting-es335/blob/main/src/summary.ipynb">src/summary.ipynb</a> (one scoring function for every model).</p>
       </div>
